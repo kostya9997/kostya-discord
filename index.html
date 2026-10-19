@@ -2,160 +2,321 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Приватный Голосовой Чат</title>
-    <!-- Используем обновленный официальный CDN jsDelivr -->
-    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+    <title>P2P Видеозвонок</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #202225; color: #fff; padding: 40px; text-align: center; margin: 0; }
-        .box { background: #2f3136; padding: 25px; border-radius: 8px; display: inline-block; width: 350px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); margin-bottom: 30px; }
-        select, button { padding: 12px; border-radius: 4px; border: none; margin: 10px 0; font-size: 16px; width: 100%; box-sizing: border-box; }
-        select { background: #40444b; color: white; cursor: pointer; }
-        button { background: #5865f2; color: white; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-        button:hover { background: #4752c4; }
-        button:disabled { background: #4f545c; cursor: not-allowed; }
-        #status { color: #b9bbbe; font-weight: bold; margin-top: 5px; font-size: 14px; }
-        #error-log { color: #f04747; font-size: 13px; margin-top: 10px; font-weight: bold; }
-        
-        .voice-channel { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-top: 20px; max-width: 800px; margin-left: auto; margin-right: auto; }
-        .user-card { background: #2f3136; padding: 20px; border-radius: 8px; width: 120px; text-align: center; border: 2px solid #4f545c; transition: all 0.3s ease; }
-        .user-card.active { border-color: #3ba55d; background: #232428; box-shadow: 0 0 10px rgba(59, 165, 93, 0.4); }
-        .avatar { width: 60px; height: 60px; background: #5865f2; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; }
-        .user-name { font-weight: bold; font-size: 14px; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: 300;
+            font-size: 28px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        /* Статус соединения */
+        .status {
+            text-align: center;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+            .status.connected {
+                background: rgba(46, 204, 113, 0.3);
+                border-color: #2ecc71;
+            }
+
+            .status.failed {
+                background: rgba(231, 76, 60, 0.3);
+                border-color: #e74c3c;
+            }
+
+            .status.waiting {
+                background: rgba(241, 196, 15, 0.3);
+                border-color: #f1c40f;
+            }
+
+        /* Видео-контейнер */
+        .video-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            aspect-ratio: 4/3;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .video-label {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.6);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            backdrop-filter: blur(5px);
+        }
+
+        /* Панель управления */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+            .control-btn:hover {
+                transform: scale(1.1);
+                background: rgba(255,255,255,0.3);
+            }
+
+            .control-btn.active {
+                background: #fff;
+                color: #1e3c72;
+            }
+
+            .control-btn.off {
+                background: #e74c3c;
+                color: #fff;
+            }
+
+                .control-btn.off:hover {
+                    background: #c0392b;
+                }
+
+            .control-btn svg {
+                width: 26px;
+                height: 26px;
+            }
+
+        /* Секции SDP */
+        .sdp-section {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+            .sdp-section h3 {
+                margin-bottom: 15px;
+                font-weight: 400;
+                font-size: 18px;
+            }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            resize: vertical;
+            margin-bottom: 10px;
+        }
+
+            textarea::placeholder {
+                color: rgba(255,255,255,0.5);
+            }
+
+            textarea:focus {
+                outline: none;
+                border-color: #3498db;
+            }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            color: #fff;
+        }
+
+        .btn-primary {
+            background: #3498db;
+        }
+
+            .btn-primary:hover {
+                background: #2980b9;
+                transform: translateY(-2px);
+            }
+
+        .btn-success {
+            background: #2ecc71;
+        }
+
+            .btn-success:hover {
+                background: #27ae60;
+                transform: translateY(-2px);
+            }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.2);
+        }
+
+            .btn-secondary:hover {
+                background: rgba(255,255,255,0.3);
+            }
+
+        .btn:disabled {
+            background: rgba(255,255,255,0.1);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .copy-status {
+            color: #2ecc71;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 700px) {
+            .video-container {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                gap: 10px;
+                padding: 15px;
+            }
+
+            .control-btn {
+                width: 50px;
+                height: 50px;
+            }
+        }
     </style>
 </head>
 <body>
+    <div class="container">
+        <h1>📹 P2P Видеозвонок</h1>
 
-    <h1>🎙️ Комната голосовой связи</h1>
-    
-    <div class="box">
-        <label for="user-select">Кто вы?</label>
-        <select id="user-select">
-            <option value="vladick">ВлаDICK</option>
-            <option value="alla">Аллах</option>
-            <option value="evgeniy">Евгейний</option>
-            <option value="kostya">Костыль</option>
-            <option value="mariam">Маруам</option>
-            <option value="andrysha">Андроид</option>
-        </select>
-        <button id="start-btn">Зайти в голосовой канал</button>
-        <div id="status">Статус: Вне канала</div>
-        <div id="error-log"></div>
+        <div id="status" class="status waiting">⏳ Ожидание действий...</div>
+
+        <div class="video-container">
+            <div class="video-wrapper">
+                <video id="local-video" autoplay playsinline muted></video>
+                <div class="video-label">👤 Вы</div>
+            </div>
+            <div class="video-wrapper">
+                <video id="remote-video" autoplay playsinline></video>
+                <div class="video-label">👥 Собеседник</div>
+            </div>
+        </div>
+
+        <!-- Панель управления микрофоном и камерой -->
+        <div class="controls">
+            <button id="mic-btn" class="control-btn active" title="Микрофон">
+                <svg id="mic-icon-on" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z" />
+                </svg>
+                <svg id="mic-icon-off" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+                    <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.98zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-3.02 0-5.42-2.38-5.91-5.38-.08-.6-.56-1.14-1-1.14-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c.98-.18 1.9-.54 2.73-1.05l4.01 4L21 19.73 4.27 3z" />
+                </svg>
+            </button>
+
+            <button id="cam-btn" class="control-btn active" title="Камера">
+                <svg id="cam-icon-on" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+                </svg>
+                <svg id="cam-icon-off" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+                    <path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.54-.18L19.73 21 21 19.73 3.27 2z" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="sdp-section">
+            <h3>📤 Шаг 1: Создайте сигнал</h3>
+            <div class="btn-row">
+                <button id="create-offer" class="btn btn-primary">📞 Я звоню</button>
+                <button id="create-answer" class="btn btn-primary">📱 Я принимаю</button>
+            </div>
+            <textarea id="local-sdp-output" placeholder="Здесь появится ваш SDP..." readonly style="margin-top:15px"></textarea>
+            <div class="btn-row">
+                <button id="copy-sdp-btn" class="btn btn-success" disabled>⏳ Сбор ICE...</button>
+                <span id="copy-status" class="copy-status"></span>
+            </div>
+        </div>
+
+        <div class="sdp-section">
+            <h3>📥 Шаг 2: Вставьте сигнал от друга</h3>
+            <textarea id="remote-sdp" placeholder="Вставьте SDP друга сюда"></textarea>
+            <button id="connect-btn" class="btn btn-success">🔗 Подключить</button>
+        </div>
     </div>
 
-    <h2>👥 Участники в канале:</h2>
-    <div class="voice-channel" id="voice-channel"></div>
-    <div id="audio-containers"></div>
-
-    <script>
-        // UUID v4 генерация
-        const TEAM_CONFIG = {
-            "vladick": "6f2b1d34-90a1-4e82-b7c3-5c8f1a2b3c4d",
-            "alla": "7a3c5e21-1b4d-4f6e-a8b2-3c4d5e6f7a8b",
-            "evgeniy": "8b4d6f32-2c5e-4a7f-b9c3-4d5e6f7a8b9c",
-            "kostya": "9c5e7a43-3d6f-4b8a-ca04-5d6f7a8b9c0d",
-            "mariam": "0d6f8b54-4e7f-4c9b-db15-6d6f7a8b9c0e",
-            "andrysha": "1e7f9c65-5f8a-4d0c-ec26-7d6f7a8b9c0f"
-        };
-
-        const UUID_TO_KEY = {};
-        const KEY_TO_NAME = { "vladick": "ВлаDICK", "alla": "Аллах", "evgeniy": "Евгейний", "kostya": "Колян", "mariam": "Марина", "andrysha": "Андроид" };
-        const KEY_TO_EMOJI = { "vladick": "🍆", "alla": "👑", "evgeniy": "🧠", "kostya": "🩼", "mariam": "🍕", "andrysha": "🤖" };
-        
-        for (let key in TEAM_CONFIG) { UUID_TO_KEY[TEAM_CONFIG[key]] = key; }
-
-        let localStream;
-        let peer;
-
-        // Запрашиваем микрофон
-        navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-            .then(stream => { 
-                localStream = stream; 
-                document.getElementById('status').innerText = 'Микрофон готов. Выберите имя.';
-            })
-            .catch(err => { 
-                document.getElementById('error-log').innerText = 'Ошибка: Доступ к микрофону заблокирован браузром!';
-            });
-
-        document.getElementById('start-btn').addEventListener('click', () => {
-            if (!localStream) return alert('Дайте доступ к микрофону!');
-            
-            const selectedUser = document.getElementById('user-select').value;
-            const myUUID = TEAM_CONFIG[selectedUser];
-
-            document.getElementById('start-btn').disabled = true;
-            document.getElementById('user-select').disabled = true;
-            document.getElementById('status').innerText = 'Связь с сервером сигналов...';
-            document.getElementById('error-log').innerText = '';
-
-            renderUserCard(myUUID, true);
-
-            // Создаем подключение
-            peer = new Peer(myUUID);
-
-            peer.on('open', (id) => {
-                document.getElementById('status').innerText = 'Вы в сети 🟢 Набираем друзей...';
-                
-                // Звоним остальным
-                for (let key in TEAM_CONFIG) {
-                    if (key !== selectedUser) {
-                        const call = peer.call(TEAM_CONFIG[key], localStream);
-                        if(call) handleCall(call);
-                    }
-                }
-            });
-
-            peer.on('call', (incomingCall) => {
-                incomingCall.answer(localStream);
-                handleCall(incomingCall);
-            });
-
-            // Отлавливаем любые сетевые ошибки PeerJS
-            peer.on('error', (err) => {
-                console.error('PeerJS Error:', err);
-                document.getElementById('error-log').innerText = `Ошибка сети: ${err.type}`;
-                if(err.type === 'unavailable-id') {
-                    document.getElementById('error-log').innerText = 'Этот персонаж уже занят в другой вкладке!';
-                }
-            });
-        });
-
-        function handleCall(call) {
-            call.on('stream', (remoteStream) => {
-                if (document.getElementById(`audio-${call.peer}`)) return;
-
-                const audio = document.createElement('audio');
-                audio.id = `audio-${call.peer}`;
-                audio.srcObject = remoteStream;
-                audio.autoplay = true;
-                audio.controls = true; // Добавим панель управления, чтобы обойти блокировку звука
-                audio.style.display = 'block';
-                audio.style.margin = '10px auto';
-                audio.style.height = '30px';
-                
-                document.getElementById('audio-containers').appendChild(audio);
-                renderUserCard(call.peer, false);
-            });
-
-            call.on('close', () => { removeUserCard(call.peer); });
-        }
-
-        function renderUserCard(uuid, isMe) {
-            if (document.getElementById(`card-${uuid}`)) return;
-            const internalKey = UUID_TO_KEY[uuid];
-            const displayName = KEY_TO_NAME[internalKey] || "Кто-то";
-            const emoji = KEY_TO_EMOJI[internalKey] || "👤";
-
-            const card = document.createElement('div');
-            card.id = `card-${uuid}`;
-            card.className = 'user-card active';
-            card.innerHTML = `<div class="avatar">${emoji}</div><div class="user-name">${displayName} ${isMe ? '(Вы)' : ''}</div>`;
-            document.getElementById('voice-channel').appendChild(card);
-        }
-
-        function removeUserCard(uuid) {
-            const card = document.getElementById(`card-${uuid}`); if (card) card.remove();
-            const audio = document.getElementById(`audio-${uuid}`); if (audio) audio.remove();
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
