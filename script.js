@@ -1,10 +1,9 @@
-﻿const configuration = {
+﻿// === ВАША КОНФИГУРАЦИЯ (без изменений) ===
+const configuration = {
     iceServers: [
         { urls: 'stun:stun.cloudflare.com:3478' },
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        //{ urls: 'stun:173.194.222.127:19302' },
-        //{ urls: 'stun:74.125.200.127:19302' },
     ]
 };
 
@@ -21,11 +20,11 @@ const connectBtn = document.getElementById('connect-btn');
 const localSdpOutput = document.getElementById('local-sdp-output');
 const localVideo = document.getElementById('local-video');
 const remoteVideo = document.getElementById('remote-video');
-const copySdpBtn = document.getElementById('copy-sdp-btn');
+const compressCopyBtn = document.getElementById('compress-copy-btn');
 const copyStatus = document.getElementById('copy-status');
 const statusDiv = document.getElementById('status');
+const onscreenLog = document.getElementById('onscreen-log');
 
-// Кнопки управления медиа
 const micBtn = document.getElementById('mic-btn');
 const camBtn = document.getElementById('cam-btn');
 const micIconOn = document.getElementById('mic-icon-on');
@@ -33,34 +32,93 @@ const micIconOff = document.getElementById('mic-icon-off');
 const camIconOn = document.getElementById('cam-icon-on');
 const camIconOff = document.getElementById('cam-icon-off');
 
+// Логирование на экран
+function log(msg, type = 'info') {
+    console.log(msg);
+    const div = document.createElement('div');
+    div.textContent = `> ${msg}`;
+    if (type === 'error') div.className = 'log-error';
+    if (type === 'warn') div.className = 'log-warn';
+    onscreenLog.appendChild(div);
+    onscreenLog.scrollTop = onscreenLog.scrollHeight;
+}
+
 // Проверка протокола
 if (window.location.protocol === 'file:') {
+    log('⚠️ ВНИМАНИЕ: Откройте через http://localhost, а не file://', 'error');
     statusDiv.textContent = '⚠️ ОШИБКА: Откройте через локальный сервер (http://localhost)';
     statusDiv.className = 'status failed';
 }
 
+// === ФУНКЦИИ СЖАТИЯ И РАСПАКОВКИ ===
+async function compressAndEncode(jsonString) {
+    const blob = new Blob([jsonString], { type: 'text/plain' });
+    const stream = blob.stream().pipeThrough(new CompressionStream('gzip'));
+    const compressedBlob = await new Response(stream).blob();
+    const buffer = await compressedBlob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+async function decodeAndDecompress(base64String) {
+    const binaryString = atob(base64String);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: 'application/gzip' });
+    const stream = blob.stream().pipeThrough(new DecompressionStream('gzip'));
+    return await new Response(stream).text();
+}
+
+async function getValidSdp(rawText) {
+    const trimmed = rawText.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('{')) return trimmed; // Обычный JSON
+
+    try {
+        log('📦 Обнаружен сжатый SDP, распаковываю...');
+        return await decodeAndDecompress(trimmed);
+    } catch (err) {
+        log('❌ Ошибка распаковки: ' + err.message, 'error');
+        throw new Error('Неверный формат SDP');
+    }
+}
+
+// === МЕДИА И СОЕДИНЕНИЕ ===
 async function startMedia() {
     if (localStream) return localStream;
     try {
+        log('🎤 Запрос доступа к камере/микрофону...');
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
         if (localVideo) localVideo.srcObject = localStream;
+        log('✅ Доступ к медиа получен');
         return localStream;
     } catch (err) {
-        alert('Ошибка доступа к камере/микрофону: ' + err.message);
+        log('❌ Ошибка медиа: ' + err.message, 'error');
+        alert('Ошибка доступа: ' + err.message);
         throw err;
     }
 }
 
 function initPeer() {
     if (pc) return;
+    log('🔧 Создание RTCPeerConnection...');
     pc = new RTCPeerConnection(configuration);
 
     if (localStream) {
-        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream);
+            log(`  📹 Добавлен трек: ${track.kind}`);
+        });
     }
 
-    copySdpBtn.disabled = true;
-    copySdpBtn.textContent = '⏳ Сбор ICE...';
+    compressCopyBtn.disabled = true;
+    compressCopyBtn.textContent = '⏳ Сбор ICE...';
     copyStatus.textContent = '';
 
     let iceReady = false;
@@ -71,50 +129,52 @@ function initPeer() {
         if (iceReady) return;
         iceReady = true;
         const elapsed = Date.now() - iceStartTime;
-        console.log(`✅ Кнопка разблокирована (${reason}) за ${elapsed} мс`);
+        log(`✅ Кнопка разблокирована (${reason}) за ${elapsed} мс`);
 
-        copySdpBtn.disabled = false;
-        copySdpBtn.textContent = '📋 Копировать SDP';
-        copyStatus.textContent = '✅ Готово к копированию!';
         if (pc.localDescription) {
-            localSdpOutput.value = JSON.stringify(pc.localDescription);
+            const rawJson = JSON.stringify(pc.localDescription);
+            compressCopyBtn.textContent = '⏳ Сжимаю...';
+
+            compressAndEncode(rawJson).then(compressed => {
+                localSdpOutput.value = compressed;
+                log(`📦 Сжато: ${rawJson.length} → ${compressed.length} симв.`);
+                compressCopyBtn.disabled = false;
+                compressCopyBtn.textContent = '📋 Копировать SDP';
+                copyStatus.textContent = '✅ Готово!';
+            }).catch(err => {
+                log('❌ Ошибка сжатия, показан оригинал', 'error');
+                localSdpOutput.value = rawJson;
+                compressCopyBtn.disabled = false;
+                compressCopyBtn.textContent = '📋 Копировать SDP';
+            });
         }
     }
 
     pc.onicecandidate = (event) => {
         const elapsed = Date.now() - iceStartTime;
-
         if (event.candidate === null) {
-            console.log(`✅ Сбор ICE полностью завершен за ${elapsed} мс`);
+            log(`✅ Сбор ICE полностью завершен за ${elapsed} мс`);
             unlockCopyButton('сбор завершен');
         } else {
-            console.log(`🌐 [${elapsed} мс] Кандидат: ${event.candidate.type} | ${event.candidate.address || 'скрыт'}:${event.candidate.port}`);
-
-            // Как только получили внешний IP (srflx) — ждём ещё 1 секунду на случай relay и разблокируем
+            log(`🌐 [${elapsed} мс] Кандидат: ${event.candidate.type} | ${event.candidate.address || 'скрыт'}`);
             if (event.candidate.type === 'srflx' && !srflxReceived) {
                 srflxReceived = true;
-                console.log('🎯 Получен внешний IP! Ждём 1 сек на случай TURN и разблокируем...');
-                setTimeout(() => unlockCopyButton('получен srflx + пауза'), 1000);
-            }
-
-            if (pc.localDescription) {
-                localSdpOutput.value = JSON.stringify(pc.localDescription);
+                log('🎯 Получен внешний IP! Ждём 1 сек и разблокируем...');
+                setTimeout(() => unlockCopyButton('получен srflx'), 1000);
             }
         }
     };
 
-    // Запасной таймаут — если ничего не пришло за 5 секунд
     setTimeout(() => unlockCopyButton('таймаут 5 сек'), 5000);
 
     pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState;
-        console.log('🔌 ICE:', state);
-
+        log(`🔌 ICE: ${state}`);
         if (state === 'connected' || state === 'completed') {
             statusDiv.textContent = '🎉 СОЕДИНЕНИЕ УСТАНОВЛЕНО!';
             statusDiv.className = 'status connected';
         } else if (state === 'failed') {
-            statusDiv.textContent = '❌ Соединение не удалось';
+            statusDiv.textContent = '❌ Соединение не удалось (проверьте сеть)';
             statusDiv.className = 'status failed';
         } else if (state === 'disconnected') {
             statusDiv.textContent = '⚠️ Соединение разорвано';
@@ -126,88 +186,30 @@ function initPeer() {
     };
 
     pc.ontrack = (event) => {
-        console.log('📥 Получен поток');
+        log('📥 Получен поток от собеседника');
         if (remoteVideo && remoteVideo.srcObject !== event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
             remoteVideo.play().catch(err => {
-                if (err.name !== 'AbortError') console.error('Ошибка play:', err);
+                if (err.name !== 'AbortError') log('Ошибка play: ' + err.message, 'error');
             });
         }
     };
 }
 
-// === УПРАВЛЕНИЕ МИКРОФОНОМ ===
-micBtn.addEventListener('click', () => {
-    if (!localStream) {
-        alert('Сначала создайте Offer или Answer!');
-        return;
-    }
-
-    micEnabled = !micEnabled;
-    const audioTrack = localStream.getAudioTracks()[0];
-    if (audioTrack) {
-        audioTrack.enabled = micEnabled; // Глушим трек, но не удаляем из соединения
-    }
-
-    if (micEnabled) {
-        micBtn.classList.remove('off');
-        micBtn.classList.add('active');
-        micIconOn.style.display = 'block';
-        micIconOff.style.display = 'none';
-        micBtn.title = 'Микрофон включен';
-    } else {
-        micBtn.classList.remove('active');
-        micBtn.classList.add('off');
-        micIconOn.style.display = 'none';
-        micIconOff.style.display = 'block';
-        micBtn.title = 'Микрофон выключен';
-    }
-});
-
-// === УПРАВЛЕНИЕ КАМЕРОЙ ===
-camBtn.addEventListener('click', () => {
-    if (!localStream) {
-        alert('Сначала создайте Offer или Answer!');
-        return;
-    }
-
-    camEnabled = !camEnabled;
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-        videoTrack.enabled = camEnabled; // Глушим трек, но не удаляем из соединения
-    }
-
-    if (camEnabled) {
-        camBtn.classList.remove('off');
-        camBtn.classList.add('active');
-        camIconOn.style.display = 'block';
-        camIconOff.style.display = 'none';
-        camBtn.title = 'Камера включена';
-    } else {
-        camBtn.classList.remove('active');
-        camBtn.classList.add('off');
-        camIconOn.style.display = 'none';
-        camIconOff.style.display = 'block';
-        camBtn.title = 'Камера выключена';
-    }
-});
-
-// === КОПИРОВАНИЕ SDP ===
-copySdpBtn.addEventListener('click', async () => {
-    if (copySdpBtn.disabled) return;
-    localSdpOutput.select();
+// === ОБРАБОТЧИКИ КНОПОК ===
+compressCopyBtn.addEventListener('click', async () => {
+    if (compressCopyBtn.disabled || !localSdpOutput.value) return;
     try {
         await navigator.clipboard.writeText(localSdpOutput.value);
-        copyStatus.textContent = '✅ Скопировано!';
+        copyStatus.textContent = `✅ Скопировано! (${localSdpOutput.value.length} симв.)`;
         setTimeout(() => { copyStatus.textContent = ''; }, 3000);
     } catch (err) {
-        document.execCommand('copy');
-        copyStatus.textContent = '✅ Скопировано!';
+        log('❌ Не удалось скопировать. Скопируйте текст вручную.', 'error');
     }
 });
 
-// === СОЗДАНИЕ OFFER ===
 createOfferBtn.addEventListener('click', async () => {
+    log('🔘 Нажато: Я звоню');
     try {
         await startMedia();
         initPeer();
@@ -216,12 +218,12 @@ createOfferBtn.addEventListener('click', async () => {
         statusDiv.textContent = '⏳ Генерация Offer...';
         statusDiv.className = 'status waiting';
     } catch (err) {
-        alert('Ошибка: ' + err.message);
+        log('❌ Ошибка Offer: ' + err.message, 'error');
     }
 });
 
-// === СОЗДАНИЕ ANSWER ===
 createAnswerBtn.addEventListener('click', async () => {
+    log('🔘 Нажато: Я принимаю');
     const remoteSdpText = remoteSdpInput.value.trim();
     if (!remoteSdpText) {
         alert('Сначала вставьте SDP от друга!');
@@ -230,19 +232,21 @@ createAnswerBtn.addEventListener('click', async () => {
     try {
         await startMedia();
         initPeer();
-        const remoteDesc = JSON.parse(remoteSdpText);
+        const validSdp = await getValidSdp(remoteSdpText);
+        const remoteDesc = JSON.parse(validSdp);
         await pc.setRemoteDescription(new RTCSessionDescription(remoteDesc));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         statusDiv.textContent = '⏳ Генерация Answer...';
         statusDiv.className = 'status waiting';
     } catch (err) {
+        log('❌ Ошибка Answer: ' + err.message, 'error');
         alert('Ошибка: ' + err.message);
     }
 });
 
-// === ПОДКЛЮЧЕНИЕ ===
 connectBtn.addEventListener('click', async () => {
+    log('🔘 Нажато: Подключить');
     if (!pc) {
         alert('Сначала создайте Offer или Answer!');
         return;
@@ -253,13 +257,38 @@ connectBtn.addEventListener('click', async () => {
         return;
     }
     try {
-        const remoteDesc = JSON.parse(remoteSdpText);
+        const validSdp = await getValidSdp(remoteSdpText);
+        const remoteDesc = JSON.parse(validSdp);
         if (!pc.remoteDescription) {
             await pc.setRemoteDescription(new RTCSessionDescription(remoteDesc));
             statusDiv.textContent = '🔍 Установка соединения...';
             statusDiv.className = 'status waiting';
         }
     } catch (err) {
-        alert('Ошибка подключения: ' + err.message);
+        log('❌ Ошибка подключения: ' + err.message, 'error');
+        alert('Ошибка: ' + err.message);
     }
+});
+
+// === УПРАВЛЕНИЕ МЕДИА ===
+micBtn.addEventListener('click', () => {
+    if (!localStream) return;
+    micEnabled = !micEnabled;
+    const track = localStream.getAudioTracks()[0];
+    if (track) track.enabled = micEnabled;
+    micBtn.classList.toggle('off', !micEnabled);
+    micBtn.classList.toggle('active', micEnabled);
+    micIconOn.style.display = micEnabled ? 'block' : 'none';
+    micIconOff.style.display = micEnabled ? 'none' : 'block';
+});
+
+camBtn.addEventListener('click', () => {
+    if (!localStream) return;
+    camEnabled = !camEnabled;
+    const track = localStream.getVideoTracks()[0];
+    if (track) track.enabled = camEnabled;
+    camBtn.classList.toggle('off', !camEnabled);
+    camBtn.classList.toggle('active', camEnabled);
+    camIconOn.style.display = camEnabled ? 'block' : 'none';
+    camIconOff.style.display = camEnabled ? 'none' : 'block';
 });

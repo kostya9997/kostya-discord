@@ -31,7 +31,6 @@
             text-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
 
-        /* Статус соединения */
         .status {
             text-align: center;
             padding: 12px;
@@ -58,7 +57,6 @@
                 border-color: #f1c40f;
             }
 
-        /* Видео-контейнер */
         .video-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -93,19 +91,16 @@
             backdrop-filter: blur(5px);
         }
 
-        /* Панель управления */
         .controls {
             display: flex;
             justify-content: center;
             gap: 15px;
-            margin: 20px 0;
+            margin: 20px auto;
             padding: 20px;
             background: rgba(0,0,0,0.3);
             border-radius: 50px;
             backdrop-filter: blur(10px);
             max-width: 400px;
-            margin-left: auto;
-            margin-right: auto;
         }
 
         .control-btn {
@@ -137,16 +132,11 @@
                 color: #fff;
             }
 
-                .control-btn.off:hover {
-                    background: #c0392b;
-                }
-
             .control-btn svg {
                 width: 26px;
                 height: 26px;
             }
 
-        /* Секции SDP */
         .sdp-section {
             background: rgba(255,255,255,0.1);
             padding: 20px;
@@ -221,18 +211,11 @@
                 transform: translateY(-2px);
             }
 
-        .btn-secondary {
-            background: rgba(255,255,255,0.2);
-        }
-
-            .btn-secondary:hover {
-                background: rgba(255,255,255,0.3);
-            }
-
         .btn:disabled {
             background: rgba(255,255,255,0.1);
             cursor: not-allowed;
             opacity: 0.6;
+            transform: none;
         }
 
         .copy-status {
@@ -241,7 +224,26 @@
             margin-left: 10px;
         }
 
-        /* Адаптивность */
+        #onscreen-log {
+            background: #1e1e1e;
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            height: 150px;
+            overflow-y: auto;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        .log-error {
+            color: #ff5555;
+        }
+
+        .log-warn {
+            color: #ffaa00;
+        }
+
         @media (max-width: 700px) {
             .video-container {
                 grid-template-columns: 1fr;
@@ -276,24 +278,14 @@
             </div>
         </div>
 
-        <!-- Панель управления микрофоном и камерой -->
         <div class="controls">
             <button id="mic-btn" class="control-btn active" title="Микрофон">
-                <svg id="mic-icon-on" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z" />
-                </svg>
-                <svg id="mic-icon-off" viewBox="0 0 24 24" fill="currentColor" style="display:none">
-                    <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.98zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-3.02 0-5.42-2.38-5.91-5.38-.08-.6-.56-1.14-1-1.14-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c.98-.18 1.9-.54 2.73-1.05l4.01 4L21 19.73 4.27 3z" />
-                </svg>
+                <svg id="mic-icon-on" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z" /></svg>
+                <svg id="mic-icon-off" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.98zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-3.02 0-5.42-2.38-5.91-5.38-.08-.6-.56-1.14-1-1.14-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c.98-.18 1.9-.54 2.73-1.05l4.01 4L21 19.73 4.27 3z" /></svg>
             </button>
-
             <button id="cam-btn" class="control-btn active" title="Камера">
-                <svg id="cam-icon-on" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
-                </svg>
-                <svg id="cam-icon-off" viewBox="0 0 24 24" fill="currentColor" style="display:none">
-                    <path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.54-.18L19.73 21 21 19.73 3.27 2z" />
-                </svg>
+                <svg id="cam-icon-on" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" /></svg>
+                <svg id="cam-icon-off" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.54-.18L19.73 21 21 19.73 3.27 2z" /></svg>
             </button>
         </div>
 
@@ -303,18 +295,21 @@
                 <button id="create-offer" class="btn btn-primary">📞 Я звоню</button>
                 <button id="create-answer" class="btn btn-primary">📱 Я принимаю</button>
             </div>
-            <textarea id="local-sdp-output" placeholder="Здесь появится ваш SDP..." readonly style="margin-top:15px"></textarea>
+            <textarea id="local-sdp-output" placeholder="Здесь появится сжатый SDP..." readonly style="margin-top:15px"></textarea>
             <div class="btn-row">
-                <button id="copy-sdp-btn" class="btn btn-success" disabled>⏳ Сбор ICE...</button>
+                <button id="compress-copy-btn" class="btn btn-success" disabled>⏳ Сбор ICE...</button>
                 <span id="copy-status" class="copy-status"></span>
             </div>
         </div>
 
         <div class="sdp-section">
             <h3>📥 Шаг 2: Вставьте сигнал от друга</h3>
-            <textarea id="remote-sdp" placeholder="Вставьте SDP друга сюда"></textarea>
+            <textarea id="remote-sdp" placeholder="Вставьте SDP друга сюда (обычный или сжатый)"></textarea>
             <button id="connect-btn" class="btn btn-success">🔗 Подключить</button>
         </div>
+
+        <h3>🖥️ Системный лог:</h3>
+        <div id="onscreen-log"></div>
     </div>
 
     <script src="script.js"></script>
