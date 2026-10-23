@@ -176,37 +176,6 @@ html, body {
     gap: 8px;
 }
 
-.header-test-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(240, 178, 50, 0.15);
-    border: 1px solid var(--status-yellow);
-    color: var(--status-yellow);
-    padding: 7px 12px;
-    border-radius: var(--radius-md);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.header-test-btn:hover {
-    background: var(--status-yellow);
-    color: #000;
-}
-
-.header-test-btn.active {
-    background: rgba(242, 63, 67, 0.15);
-    border-color: var(--status-red);
-    color: var(--status-red);
-}
-
-.header-test-btn.active:hover {
-    background: var(--status-red);
-    color: #fff;
-}
-
 .header-icon-btn {
     display: inline-flex;
     align-items: center;
@@ -1426,8 +1395,7 @@ textarea[readonly] {
 
 /* === АДАПТИВНОСТЬ ДЛЯ СМАРТФОНОВ === */
 @media (max-width: 640px) {
-    .btn-text-desktop,
-    .test-btn-text {
+    .btn-text-desktop {
         display: none;
     }
 
@@ -1481,11 +1449,6 @@ textarea[readonly] {
     .header-actions {
         gap: 6px;
         flex-shrink: 0;
-    }
-
-    .header-test-btn {
-        padding: 6px 10px;
-        font-size: 12px;
     }
 
     .header-icon-btn {

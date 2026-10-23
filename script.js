@@ -20,10 +20,6 @@ let reconnectTimeout = 3000;
 let currentRole = 'caller'; // 'caller' | 'answerer'
 let rawLocalJson = '';
 let rawRemoteJson = '';
-let isTestMode = false;
-let testCanvas = null;
-let testAnimFrame = null;
-let testStream = null;
 
 // === СОСТОЯНИЕ ИНТЕРАКТИВНОГО АВАТАРА ===
 let audioCtx = null;
@@ -48,8 +44,6 @@ const CHUNK_SIZE = 16384; // 16 KB безопасный размер чанка 
 const statusBadge = document.getElementById('status-badge');
 const statusText = document.getElementById('status-text');
 const callTimer = document.getElementById('call-timer');
-const testCallBtn = document.getElementById('test-call-btn');
-const devTestCallBtn = document.getElementById('dev-test-call-btn');
 const toggleDevBtn = document.getElementById('toggle-dev-btn');
 const devDrawer = document.getElementById('dev-drawer');
 const closeDevBtn = document.getElementById('close-dev-btn');
@@ -2220,24 +2214,6 @@ async function sendFile(fileOrBlob, options = {}) {
         } catch (err) {
             log('❌ Ошибка отправки файла: ' + err.message, 'error');
         }
-    } else if (isTestMode) {
-        // Симуляция ответа в тестовом режиме
-        setTimeout(() => {
-            if (!isTestMode) return;
-            const replyText = isInlineImage
-                ? 'Классная картинка, чувак! Заценил 👍'
-                : `Файл "${fileName}" успешно получен! (${formatFileSize(fileSize)})`;
-
-            appendChatMessage({
-                sender: 'remote',
-                senderName: 'Собеседник',
-                text: replyText,
-                time: new Date().toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                }),
-            });
-        }, 800);
     }
 }
 
@@ -2253,204 +2229,11 @@ function toggleChat() {
     }
 }
 
-function simulateTestChatReply(userText) {
-    const replies = [
-        'Ага, привет! Чат работает на ура!',
-        'Слышу и вижу тебя отлично!',
-        'Никаких серверов — чистый P2P DataChannel! Зацени скорость!',
-        'Да, всё супер! Отличная связь!',
-        'Связь стабильная, задержка минимальная, всё работает идеально!',
-    ];
-    const randomReply = replies[Math.floor(Math.random() * replies.length)];
-
-    setTimeout(() => {
-        if (!isTestMode) return;
-        const time = new Date().toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-        appendChatMessage({
-            sender: 'remote',
-            senderName: 'Собеседник',
-            text: randomReply,
-            time: time,
-        });
-    }, 800);
-}
-
-// === ТЕСТОВЫЙ РЕЖИМ UI (СИМУЛЯЦИЯ ЗВОНКА) ===
-function createMockRemoteStream() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 640;
-    canvas.height = 480;
-    const ctx = canvas.getContext('2d');
-    testCanvas = canvas;
-
-    let buddyBlinkCounter = 0;
-    let buddyIsBlinking = false;
-    let mockSpeechTimer = 0;
-
-    function render() {
-        if (!isTestMode) return;
-        mockSpeechTimer += 0.05;
-
-        // Симуляция речи собеседника (периодически шлёпает ртом как в мультфильме)
-        const isSpeaking = Math.sin(mockSpeechTimer * 0.9) > -0.2;
-        let buddyTarget = 0;
-        if (isSpeaking) {
-            const chatter = Math.abs(Math.sin(mockSpeechTimer * 7));
-            buddyTarget = chatter * 0.85;
-        }
-
-        // Подсвечиваем зеленый Speaking Ring собеседника в такт речи
-        if (remoteTile) {
-            remoteTile.classList.toggle('speaking', isSpeaking);
-        }
-
-        buddyBlinkCounter++;
-        if (buddyBlinkCounter > 130 && Math.random() < 0.04) {
-            buddyIsBlinking = true;
-            buddyBlinkCounter = 0;
-        } else if (buddyIsBlinking && buddyBlinkCounter > 6) {
-            buddyIsBlinking = false;
-        }
-
-        ctx.fillStyle = '#1e1f22';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        drawCartoonCharacter(ctx, {
-            cx: 320,
-            cy: 230,
-            mouthOpen: buddyTarget,
-            isBlinking: buddyIsBlinking,
-            suitColor: '#e74c3c',
-            hairColor: '#e67e22',
-            skinColor: '#ffe0bd',
-            nameTag: '👥 Собеседник',
-            volumeLevel: isSpeaking ? 0.75 : 0,
-            isMuted: false,
-            hatStyle: 'ushanka',
-        });
-
-        testAnimFrame = requestAnimationFrame(render);
-    }
-
-    render();
-    testStream = canvas.captureStream(30);
-    return testStream;
-}
-
-async function startTestCall() {
-    if (isTestMode) {
-        stopTestCall();
-        return;
-    }
-    isTestMode = true;
-    log('🧪 Запуск тестового звонка (симуляция активного интерфейса)...');
-
-    // Пробуем включить свои медиа для локального окна
-    try {
-        await startMedia();
-    } catch (e) {
-        log(
-            'ℹ️ Локальная веб-камера недоступна (отображается заглушка)',
-            'warn',
-        );
-    }
-
-    // Если камера выключена, показываем в локальном окне аватар
-    if (localVideo) {
-        localVideo.srcObject = camEnabled ? localStream : avatarStream;
-        localVideo.style.transform = camEnabled ? 'scaleX(-1)' : 'none';
-    }
-
-    // Генерируем тестовый видеопоток собеседника
-    const mockStream = createMockRemoteStream();
-    if (remoteVideo) {
-        remoteVideo.srcObject = mockStream;
-        remoteVideo.play().catch(() => {});
-    }
-    if (remoteAvatar) remoteAvatar.style.display = 'none';
-
-    // Переключаем экраны
-    lobbyView.style.display = 'none';
-    callStageView.style.display = 'flex';
-    startCallTimer();
-    updateAppStatus('В звонке (Тест UI)', 'connected');
-
-    // Обновляем состояние кнопок теста
-    testCallBtn.innerHTML =
-        '⏹️ <span class="test-btn-text">Завершить тест</span>';
-    testCallBtn.classList.add('active');
-    if (devTestCallBtn)
-        devTestCallBtn.textContent = '⏹️ Остановить тестовый звонок';
-
-    log(
-        '✅ Тестовый режим активен! Включите микрофон, чтобы проверить, как аватар говорит в такт вашей речи.',
-    );
-}
-
-function stopTestCall() {
-    if (!isTestMode) return;
-    isTestMode = false;
-    log('⏹️ Тестовый звонок остановлен');
-
-    if (testAnimFrame) {
-        cancelAnimationFrame(testAnimFrame);
-        testAnimFrame = null;
-    }
-    if (testStream) {
-        testStream.getTracks().forEach((t) => t.stop());
-        testStream = null;
-    }
-    if (remoteVideo) {
-        remoteVideo.srcObject = null;
-    }
-    if (remoteAvatar) {
-        remoteAvatar.style.display = 'flex';
-    }
-
-    if (remoteTile) remoteTile.classList.remove('speaking');
-    if (localTile) localTile.classList.remove('speaking');
-
-    testCallBtn.innerHTML =
-        '🧪 <span class="test-btn-text">Тест UI звонка</span>';
-    testCallBtn.classList.remove('active');
-    if (devTestCallBtn)
-        devTestCallBtn.textContent = '🧪 Запустить / Остановить демо-звонок';
-
-    resetCall();
-}
-
-testCallBtn.addEventListener('click', () => {
-    if (isTestMode) stopTestCall();
-    else startTestCall();
-});
-
-if (devTestCallBtn) {
-    devTestCallBtn.addEventListener('click', () => {
-        if (isTestMode) stopTestCall();
-        else startTestCall();
-    });
-}
-
 // === ЗАВЕРШЕНИЕ ЗВОНКА (LEAVE / RESET) ===
 function resetCall() {
     log('🔴 Завершение вызова и сброс состояния...');
     stopCallTimer();
     stopScreenShare();
-
-    if (isTestMode) {
-        isTestMode = false;
-        if (testAnimFrame) cancelAnimationFrame(testAnimFrame);
-        if (testStream) testStream.getTracks().forEach((t) => t.stop());
-        testCallBtn.innerHTML =
-            '🧪 <span class="test-btn-text">Тест UI звонка</span>';
-        testCallBtn.classList.remove('active');
-        if (devTestCallBtn)
-            devTestCallBtn.textContent =
-                '🧪 Запустить / Остановить демо-звонок';
-    }
 
     if (pc) {
         pc.close();
@@ -2530,10 +2313,6 @@ function resetCall() {
 }
 
 leaveCallBtn.addEventListener('click', () => {
-    if (isTestMode) {
-        stopTestCall();
-        return;
-    }
     if (confirm('Вы уверены, что хотите завершить звонок?')) {
         resetCall();
     }
@@ -2616,8 +2395,6 @@ if (chatForm) {
 
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(JSON.stringify({ text, time }));
-        } else if (isTestMode) {
-            simulateTestChatReply(text);
         } else {
             log(
                 'ℹ️ Сообщение сохранено локально (канал передачи пока не готов)',
@@ -3377,7 +3154,6 @@ function initWhiteboard() {
         drawWbLine(x, y, x + 0.1, y + 0.1, wbColor, wbSize, wbIsEraser);
     }
 
-    let mockDrawTriggered = false;
     function onPointerMove(e) {
         if (!isWbDrawing) return;
         e.preventDefault();
@@ -3397,16 +3173,6 @@ function initWhiteboard() {
                     isEraser: wbIsEraser,
                 }),
             );
-        }
-
-        if (isTestMode && !mockDrawTriggered) {
-            mockDrawTriggered = true;
-            setTimeout(() => {
-                mockBuddyWhiteboardDoodle();
-                setTimeout(() => {
-                    mockDrawTriggered = false;
-                }, 8000);
-            }, 1800);
         }
 
         lastWbX = x;
@@ -3647,53 +3413,6 @@ function handleRemoteWbDraw(msg) {
 
 function handleRemoteWbClear() {
     clearWhiteboardLocally();
-}
-
-// Забавный смайлик от собеседника в тест-режиме
-function mockBuddyWhiteboardDoodle() {
-    if (!isWhiteboardOpen || !whiteboardCanvas) return;
-    const w = whiteboardCanvas.width;
-    const h = whiteboardCanvas.height;
-    const cx = w * 0.72;
-    const cy = h * 0.35;
-    const r = Math.min(w, h) * 0.12;
-
-    let angle = 0;
-    const interval = setInterval(() => {
-        const x0 = cx + Math.cos(angle) * r;
-        const y0 = cy + Math.sin(angle) * r;
-        angle += 0.3;
-        const x1 = cx + Math.cos(angle) * r;
-        const y1 = cy + Math.sin(angle) * r;
-        drawWbLine(x0, y0, x1, y1, '#fee75c', 5);
-
-        if (angle >= Math.PI * 2) {
-            clearInterval(interval);
-            drawWbLine(
-                cx - r * 0.35,
-                cy - r * 0.25,
-                cx - r * 0.35 + 0.1,
-                cy - r * 0.25 + 0.1,
-                '#fee75c',
-                8,
-            );
-            drawWbLine(
-                cx + r * 0.35,
-                cy - r * 0.25,
-                cx + r * 0.35 + 0.1,
-                cy - r * 0.25 + 0.1,
-                '#fee75c',
-                8,
-            );
-            for (let a = Math.PI * 0.2; a <= Math.PI * 0.8; a += 0.15) {
-                const sx0 = cx + Math.cos(a) * (r * 0.6);
-                const sy0 = cy + Math.sin(a) * (r * 0.6);
-                const sx1 = cx + Math.cos(a + 0.15) * (r * 0.6);
-                const sy1 = cy + Math.sin(a + 0.15) * (r * 0.6);
-                drawWbLine(sx0, sy0, sx1, sy1, '#eb459e', 5);
-            }
-        }
-    }, 25);
 }
 
 // Закрытие всплывающих панелей при клике в пустую область
