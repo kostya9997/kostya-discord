@@ -1410,7 +1410,7 @@ function initPeer() {
         const videoTrack =
             camEnabled && realVideoTrack ? realVideoTrack : getAvatarTrack();
         if (videoTrack) {
-            pc.addTrack(videoTrack, avatarStream || localStream);
+            pc.addTrack(videoTrack, localStream);
         }
     }
 
