@@ -977,6 +977,9 @@ function setupRemoteAudioAnalysis(stream) {
         remoteAudioAnalyser.smoothingTimeConstant = 0.25;
         src.connect(remoteAudioAnalyser);
 
+        remoteAudioAnalyser.connect(remoteAudioCtx.destination); // Выводим звук на динамики
+        if (remoteVideo) remoteVideo.muted = true;
+
         function checkRemoteVolume() {
             if (
                 !remoteAudioAnalyser ||
@@ -1580,18 +1583,24 @@ function initPeer() {
     };
 
     pc.ontrack = (event) => {
-        log('📥 Получен медиа-поток от собеседника');
-        if (remoteVideo && remoteVideo.srcObject !== event.streams[0]) {
-            remoteVideo.srcObject = event.streams[0];
-            remoteVideo.play().catch((err) => {
-                if (err.name !== 'AbortError')
-                    log('Ошибка воспроизведения: ' + err.message, 'error');
-            });
-            // Скрываем заглушку аватара
-            if (remoteAvatar) remoteAvatar.style.display = 'none';
+        log(`📥 Получен медиа-трек от собеседника: ${event.track.kind}`);
 
-            // Настраиваем Speaking Ring для собеседника
-            setupRemoteAudioAnalysis(event.streams[0]);
+        // 1. ИСПРАВЛЕНИЕ: Аккуратно добавляем треки в единый поток, не перезаписывая его
+        if (!remoteVideo.srcObject) {
+            remoteVideo.srcObject = new MediaStream();
+        }
+        remoteVideo.srcObject.addTrack(event.track);
+
+        remoteVideo.play().catch((err) => {
+            if (err.name !== 'AbortError')
+                log('Ошибка воспроизведения: ' + err.message, 'error');
+        });
+
+        if (remoteAvatar) remoteAvatar.style.display = 'none';
+
+        // 2. ИСПРАВЛЕНИЕ: Запускаем анализатор только тогда, когда пришло аудио
+        if (event.track.kind === 'audio') {
+            setupRemoteAudioAnalysis(remoteVideo.srcObject);
         }
     };
 }
