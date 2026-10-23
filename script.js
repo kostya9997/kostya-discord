@@ -224,39 +224,27 @@ function updateDevMetrics() {
 }
 
 // === СЖАТИЕ И ДЕКОДИРОВАНИЕ SDP (Gzip + Base64) ===
-async function compressAndEncode(jsonString) {
-    const blob = new Blob([jsonString], { type: 'text/plain' });
-    const stream = blob.stream().pipeThrough(new CompressionStream('gzip'));
-    const compressedBlob = await new Response(stream).blob();
-    const buffer = await compressedBlob.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++)
-        binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
+function compressAndEncode(sdpString) {
+    // sdpString — это только pc.localDescription.sdp, без JSON-обёртки
+    return sdpCompact.compactSDP(sdpString, {
+        compress: 'base64' //base64/base92
+    });
 }
 
-async function decodeAndDecompress(base64String) {
-    const binaryString = atob(base64String);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++)
-        bytes[i] = binaryString.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'application/gzip' });
-    const stream = blob.stream().pipeThrough(new DecompressionStream('gzip'));
-    return await new Response(stream).text();
+function decodeAndDecompress(compactedSdp, isOffer) {
+    return sdpCompact.decompactSDP(compactedSdp, isOffer, {
+        compress: 'base64' //base64/base92
+    });
 }
 
-async function getValidSdp(rawText) {
+async function getValidSdp(rawText, isOffer) {
     const trimmed = rawText.trim();
     if (!trimmed) return null;
-    if (trimmed.startsWith('{')) return trimmed;
-    try {
-        log('📦 Распаковка сжатого SDP токена...');
-        return await decodeAndDecompress(trimmed);
-    } catch (err) {
-        log('❌ Ошибка распаковки токена: ' + err.message, 'error');
-        throw new Error('Неверный формат кода звонка или поврежденные данные');
-    }
+
+    // Иначе — это сжатая строка от sdp-compact
+    log('📦 Распаковка SDP (sdp-compact)...');
+    const sdp = decodeAndDecompress(trimmed, isOffer);
+    return JSON.stringify({ type: isOffer ? 'offer' : 'answer', sdp });
 }
 
 // === МЕМНЫЙ АВАТАР (ИНТЕРАКТИВНЫЙ РИСОВАННЫЙ СТИЛЬ) ===
@@ -1403,7 +1391,7 @@ function stopCallTimer() {
 function initPeer() {
     if (pc) return;
     log('🔧 Создание RTCPeerConnection...');
-    pc = new RTCPeerConnection(configuration);
+    pc = new RTCPeerConnection({ ...configuration, bundlePolicy: "max-bundle" });
 
     if (localStream) {
         const audioTrack = localStream.getAudioTracks()[0];
@@ -1433,6 +1421,7 @@ function initPeer() {
         setupDataChannel(event.channel);
     };
 
+    let addedCandidatesCount = 0;
     let firstHostAdded = false;
     let iceReady = false;
     let srflxReceived = false;
@@ -1442,57 +1431,67 @@ function initPeer() {
         iceReady = true;
         log(`✅ ICE готов (${reason})`);
 
+        if (addedCandidatesCount === 0) {
+            log('❌ ICE-кандидаты не найдены! Проверьте сеть и STUN-серверы.', 'error');
+            updateAppStatus('Ошибка: нет кандидатов', 'failed');
+
+            // Не выводим код, сбрасываем состояние кнопки
+            if (currentRole === 'caller') {
+                createCallBtn.disabled = false;
+                createCallBtn.innerHTML = 'Сгенерировать код звонка';
+            } else {
+                answerCallBtn.disabled = false;
+                answerCallBtn.innerHTML = '✅ Принять звонок';
+            }
+            return; // Выходим, код не генерируем
+        }
+
         if (pc.localDescription) {
             rawLocalJson = JSON.stringify(pc.localDescription);
             devLocalSdp.value = rawLocalJson;
 
-            compressAndEncode(rawLocalJson)
-                .then((compressed) => {
-                    const ratio = Math.round(
-                        (compressed.length / rawLocalJson.length) * 100,
-                    );
-                    metricCompression.textContent = `${rawLocalJson.length}B → ${compressed.length}B (${ratio}%)`;
-                    log(
-                        `📦 Код сжат: ${rawLocalJson.length} → ${compressed.length} символов (-${100 - ratio}%)`,
-                    );
-
-                    if (currentRole === 'caller') {
-                        callerLocalToken.value = compressed;
-                        copyCallerTokenBtn.disabled = false;
-                        shareCallerTokenBtn.disabled = false;
-                        callerStep2.classList.remove('disabled');
-                        callerStep3.classList.remove('disabled');
-                        updateAppStatus(
-                            'Код звонка готов, отправьте другу',
-                            'waiting',
-                        );
-                    } else {
-                        answererLocalToken.value = compressed;
-                        copyAnswererTokenBtn.disabled = false;
-                        shareAnswererTokenBtn.disabled = false;
-                        answererStep2.classList.remove('disabled');
-                        updateAppStatus(
-                            'Ответный код готов, отправьте звонящему',
-                            'waiting',
-                        );
-                    }
+            let newsdp = pc.localDescription.sdp
+                .split('\r\n')
+                .filter(line => {
+                    if (!line.startsWith('a=candidate:')) return true;
+                    if (line.includes('.local')) return false;
+                    const rest = line.slice('a=candidate:'.length);
+                    if (rest.includes(':')) return false; 
+                    return true;
                 })
-                .catch((err) => {
-                    log(
-                        '⚠️ Ошибка сжатия, используем raw SDP: ' + err.message,
-                        'warn',
-                    );
-                    const token = rawLocalJson;
-                    if (currentRole === 'caller') {
-                        callerLocalToken.value = token;
-                        copyCallerTokenBtn.disabled = false;
-                        callerStep2.classList.remove('disabled');
-                    } else {
-                        answererLocalToken.value = token;
-                        copyAnswererTokenBtn.disabled = false;
-                        answererStep2.classList.remove('disabled');
-                    }
-                });
+                .join('\r\n');
+
+            const compressed = compressAndEncode(newsdp);
+            const ratio = Math.round(
+                (compressed.length / rawLocalJson.length) * 100,
+            );
+            metricCompression.textContent = `${rawLocalJson.length}B → ${compressed.length}B (${ratio}%)`;
+            log(
+                `📦 Код сжат: ${rawLocalJson.length} → ${compressed.length} символов (-${100 - ratio}%)`,
+            );
+
+            if (currentRole === 'caller') {
+                callerLocalToken.value = compressed;
+                //callerLocalToken.value = rawLocalJson;
+                copyCallerTokenBtn.disabled = false;
+                shareCallerTokenBtn.disabled = false;
+                callerStep2.classList.remove('disabled');
+                callerStep3.classList.remove('disabled');
+                updateAppStatus(
+                    'Код звонка готов, отправьте другу',
+                    'waiting',
+                );
+            }
+            else {
+                answererLocalToken.value = compressed;
+                copyAnswererTokenBtn.disabled = false;
+                shareAnswererTokenBtn.disabled = false;
+                answererStep2.classList.remove('disabled');
+                updateAppStatus(
+                    'Ответный код готов, отправьте звонящему',
+                    'waiting',
+                );
+            }
         }
     }
 
@@ -1506,6 +1505,12 @@ function initPeer() {
             // Фильтрация IPv6 для минимизации размера токена
             if (address.includes(':')) {
                 log(`🚫 Пропуск IPv6: ${address}`, 'ice');
+                return;
+            }
+
+            // Фильтрация mDNS (.local) host-кандидатов — бесполезны для соединения через интернет
+            if (address.endsWith('.local')) {
+                log(`🚫 Пропуск mDNS host: ${address}`, 'ice');
                 return;
             }
 
@@ -1524,16 +1529,15 @@ function initPeer() {
                 'ice',
             );
 
+            addedCandidatesCount++;
+
             if (candidate.type === 'srflx' && !srflxReceived) {
                 srflxReceived = true;
-                setTimeout(() => unlockCopyButton('получен srflx'), 1000);
+                unlockCopyButton('получен srflx');
             }
         }
         updateDevMetrics();
     };
-
-    // Таймаут на сбор кандидатов 5 сек
-    setTimeout(() => unlockCopyButton('таймаут 5 сек'), 5000);
 
     // Обработка состояния соединения
     pc.oniceconnectionstatechange = () => {
@@ -1673,7 +1677,42 @@ createCallBtn.addEventListener('click', async () => {
     createCallBtn.innerHTML = '⏳ Создаем вызов...';
     try {
         await startMedia();
+
+        // Сброс старого peer connection перед повторной генерацией
+        if (pc) {
+            log('♻️ Пересоздание RTCPeerConnection...');
+            pc.close();
+            pc = null;
+        }
+
         initPeer();
+
+        const transceivers = pc.getTransceivers();
+
+        for (const transceiver of transceivers) {
+            const kind = transceiver.receiver.track.kind; // 'audio' или 'video'
+
+            // Получаем все кодеки, поддерживаемые текущим transceiver
+            const codecs = RTCRtpSender.getCapabilities(kind).codecs;
+
+            let filtered;
+            if (kind === 'video') {
+                // Оставляем только VP8 и связанный с ним RTX (если нужен)
+                filtered = codecs.filter(c =>
+                    c.mimeType === 'video/VP8' ||
+                    c.mimeType === 'video/rtx' && c.sdpFmtpLine?.includes('apt=96') // номер должен соответствовать payload VP8
+                );
+                // Если хотите использовать H264, замените на:
+                // filtered = codecs.filter(c => c.mimeType === 'video/H264' && c.sdpFmtpLine?.includes('profile-level-id=42e01f'));
+            } else {
+                // Аудио оставляем только Opus
+                filtered = codecs.filter(c => c.mimeType === 'audio/opus');
+            }
+
+            // Ключевой момент: setCodecPreferences должен вызываться перед createOffer
+            transceiver.setCodecPreferences(filtered);
+        }
+
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         updateAppStatus('Сбор маршрутов связи...', 'waiting');
@@ -1753,7 +1792,7 @@ callerConnectBtn.addEventListener('click', async () => {
     }
 
     try {
-        const validSdp = await getValidSdp(remoteToken);
+        const validSdp = await getValidSdp(remoteToken, false);
         rawRemoteJson = validSdp;
         devRemoteSdp.value = validSdp;
 
@@ -1798,7 +1837,7 @@ answerCallBtn.addEventListener('click', async () => {
     try {
         await startMedia();
         initPeer();
-        const validSdp = await getValidSdp(remoteToken);
+        const validSdp = await getValidSdp(remoteToken, true);
         rawRemoteJson = validSdp;
         devRemoteSdp.value = validSdp;
 
