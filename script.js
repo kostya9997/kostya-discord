@@ -1,7 +1,7 @@
 // === КОНФИГУРАЦИЯ И ВЕРСИОНИРОВАНИЕ ПРИЛОЖЕНИЯ ===
 const APP_VERSION = '1.5.0';
 const APP_BUILD_DATE = '25.10.2026';
-const APP_BUILD_ID = '20261025-r3';
+const APP_BUILD_ID = '20261025-r4';
 
 // Делаем версию доступной в глобальном контексте window для удобной отладки в консоли
 window.APP_VERSION = APP_VERSION;
@@ -1416,6 +1416,81 @@ function drawCartoonCharacter(ctx, options) {
     ctx.restore();
 }
 
+
+// === АУДИО АНАЛИЗАТОР РЕЧИ (WEB AUDIO API) ===
+function setupAudioAnalyser(stream) {
+    try {
+        const AudioContextClass =
+            window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        if (!audioCtx) {
+            audioCtx = new AudioContextClass();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        if (audioSource) {
+            audioSource.disconnect();
+        }
+        analyserNode = audioCtx.createAnalyser();
+        analyserNode.fftSize = 256;
+        analyserNode.smoothingTimeConstant = 0.25;
+        audioSource = audioCtx.createMediaStreamSource(stream);
+        audioSource.connect(analyserNode);
+        log('🎙️ Аудио-анализатор речи подключен к говорящему аватару');
+    } catch (e) {
+        log('⚠️ Ошибка аудио-анализатора: ' + e.message, 'warn');
+    }
+}
+
+// === АУДИО АНАЛИЗАТОР УДАЛЕННОГО СОБЕСЕДНИКА (SPEAKING RING) ===
+function setupRemoteAudioAnalysis(stream) {
+    try {
+        if (!stream || !stream.getAudioTracks().length) return;
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtxClass) return;
+        if (!remoteAudioCtx) {
+            remoteAudioCtx = new AudioCtxClass();
+        }
+        if (remoteAudioCtx.state === 'suspended') {
+            remoteAudioCtx.resume();
+        }
+        const src = remoteAudioCtx.createMediaStreamSource(stream);
+        remoteAudioAnalyser = remoteAudioCtx.createAnalyser();
+        remoteAudioAnalyser.fftSize = 256;
+        remoteAudioAnalyser.smoothingTimeConstant = 0.25;
+        src.connect(remoteAudioAnalyser);
+
+        remoteAudioAnalyser.connect(remoteAudioCtx.destination); // Выводим звук на динамики
+        if (remoteVideo) remoteVideo.muted = true;
+
+        function checkRemoteVolume() {
+            if (
+                !remoteAudioAnalyser ||
+                !remoteVideo ||
+                !remoteVideo.srcObject
+            ) {
+                if (remoteTile) remoteTile.classList.remove('speaking');
+                return;
+            }
+            const data = new Uint8Array(remoteAudioAnalyser.frequencyBinCount);
+            remoteAudioAnalyser.getByteFrequencyData(data);
+            let sum = 0;
+            const bins = Math.min(data.length, 35);
+            for (let i = 0; i < bins; i++) sum += data[i];
+            const avg = sum / bins;
+            const isSpeaking = avg > 14;
+            if (remoteTile) remoteTile.classList.toggle('speaking', isSpeaking);
+            remoteAudioAnimFrame = requestAnimationFrame(checkRemoteVolume);
+        }
+
+        if (remoteAudioAnimFrame) cancelAnimationFrame(remoteAudioAnimFrame);
+        checkRemoteVolume();
+        log('🎙️ Аудио-анализатор удаленного собеседника подключен');
+    } catch (e) {
+        log('ℹ️ Удаленный аудио-анализ: ' + e.message, 'warn');
+    }
+}
 
 // === ПОЛУЧЕНИЕ И КЭШИРОВАНИЕ ЗАГРУЖЕННОГО ФОТО ===
 function getUserPhotoImg(onLoadCallback) {
