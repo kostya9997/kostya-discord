@@ -4750,6 +4750,7 @@ function renderWardrobePreview() {
             isBlinking: false,
             suitColor: avatarProfile.suitColor || '#5865f2',
             hatStyle: avatarProfile.hatStyle || 'ushanka',
+            character: avatarProfile.character || 'southpark',
             nameTag: avatarProfile.name || 'Вы',
             isMiniPreview: true,
         });
@@ -7707,30 +7708,42 @@ function renderRecordingFrame() {
             }
 
             if (!secDrawn) {
-                const pcx = pipX + pipW / 2;
-                const pcy = pipY + pipH / 2 - 12;
-                const pr = 36;
-                ctx.beginPath();
-                ctx.arc(pcx, pcy, pr, 0, Math.PI * 2);
-                ctx.fillStyle = (secProfile && secProfile.suitColor) || '#5865f2';
-                ctx.fill();
-
-                if (isSecSpeaking) {
-                    ctx.lineWidth = 4;
-                    ctx.strokeStyle = '#23a55a';
-                    ctx.stroke();
+                if (secProfile?.mode === 'disabled') {
+                    const pcx = pipX + pipW / 2;
+                    const pcy = pipY + pipH / 2 - 12;
+                    const pr = 36;
+                    ctx.beginPath();
+                    ctx.arc(pcx, pcy, pr, 0, Math.PI * 2);
+                    ctx.fillStyle = (secProfile && secProfile.suitColor) || '#5865f2';
+                    ctx.fill();
+                    if (isSecSpeaking) {
+                        ctx.lineWidth = 4;
+                        ctx.strokeStyle = '#23a55a';
+                        ctx.stroke();
+                    }
+                    const pInitial = safeSecName.trim().charAt(0).toUpperCase() || '👤';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 30px "Inter", sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(pInitial, pcx, pcy);
+                    ctx.fillStyle = '#dbdee1';
+                    ctx.font = '500 13px "Inter", sans-serif';
+                    ctx.fillText(safeSecName, pcx, pcy + pr + 20);
+                } else {
+                    drawCartoonCharacter(ctx, {
+                        cx: pipX + pipW / 2,
+                        cy: pipY + pipH / 2 - 12,
+                        mouthOpen: isSecSpeaking ? 0.7 : 0,
+                        isBlinking: false,
+                        suitColor: secProfile?.suitColor || '#5865f2',
+                        nameTag: safeSecName,
+                        character: secProfile?.character || 'southpark',
+                        hatStyle: secProfile?.hatStyle || 'ushanka',
+                        volumeLevel: isSecSpeaking ? 0.8 : 0,
+                        scale: 0.65,
+                    });
                 }
-
-                const pInitial = safeSecName.trim().charAt(0).toUpperCase() || '👤';
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 30px "Inter", sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(pInitial, pcx, pcy);
-
-                ctx.fillStyle = '#dbdee1';
-                ctx.font = '500 13px "Inter", sans-serif';
-                ctx.fillText(safeSecName, pcx, pcy + pr + 20);
             }
 
             ctx.restore(); // Сброс clip

@@ -85,17 +85,15 @@ html, body {
 }
 
 .brand-logo {
-    width: 36px;
-    height: 36px;
-    background: var(--accent-blurple);
-    color: #fff;
-    border-radius: var(--radius-md);
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 8px rgba(88, 101, 242, 0.4);
-    padding: 6px;
+    box-shadow: 0 2px 8px rgba(88, 101, 242, 0.35);
+    border-radius: 9px;
     flex-shrink: 0;
+    overflow: hidden;
 }
 
 .brand-logo svg {
@@ -4007,4 +4005,87 @@ textarea[readonly] {
 .record-privacy-hint {
     font-size: 11px;
     color: var(--text-muted);
+}
+
+/* Прокручиваемый список истории версий */
+.version-changelog-scroll {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.version-changelog-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.version-changelog-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.version-changelog-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.version-changelog-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.version-release-block {
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    transition: all var(--transition-fast);
+}
+
+.version-release-block.latest {
+    border-color: rgba(88, 101, 242, 0.55);
+    background: rgba(88, 101, 242, 0.08);
+}
+
+.version-release-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.version-release-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-header);
+}
+
+.version-release-block.latest .version-release-title {
+    color: #5865f2;
+}
+
+.version-release-date {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.06);
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+}
+
+.version-release-block ul {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.version-release-block li {
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text-normal);
 }
