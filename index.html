@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>P2P Видеозвонок</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" href="favicon.svg">
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,16 +16,15 @@
         <!-- Верхняя шапка -->
         <header class="app-header">
             <div class="header-brand">
-                <div class="brand-logo">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                <div class="brand-logo" title="Discord P2P Call">
+                    <svg viewBox="0 0 127.14 96.36" fill="currentColor">
+                        <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/>
                     </svg>
                 </div>
                 <div class="brand-info">
                     <div class="brand-title-wrap">
                         <span class="brand-title">P2P Видеозвонок</span>
-                        <span id="app-version-badge" class="version-badge" title="Версия приложения (нажмите для подробностей)">v1.4.1</span>
+                        <span id="app-version-badge" class="version-badge" title="Версия приложения (нажмите для подробностей)">v1.5.0</span>
                     </div>
                     <span id="call-timer" class="call-timer" style="display: none;">00:00</span>
                 </div>
@@ -116,6 +117,35 @@
                                 </div>
                                 <!-- Секция мультяшного персонажа -->
                                 <div id="cartoon-wardrobe-section" class="wardrobe-section">
+                                    <div class="wardrobe-field">
+                                        <label>Персонаж / Стиль:</label>
+                                        <div class="character-selector">
+                                            <button type="button" class="character-btn active" data-character="southpark" title="Южный Парк (Канадец)">
+                                                <span class="char-icon">🍁</span>
+                                                <span class="char-label">Канадец</span>
+                                            </button>
+                                            <button type="button" class="character-btn" data-character="popcat" title="Pop Cat (Мемный кот)">
+                                                <span class="char-icon">🐱</span>
+                                                <span class="char-label">Pop Cat</span>
+                                            </button>
+                                            <button type="button" class="character-btn" data-character="robot" title="Робот B-42">
+                                                <span class="char-icon">🤖</span>
+                                                <span class="char-label">Робот</span>
+                                            </button>
+                                            <button type="button" class="character-btn" data-character="frog" title="Лягушонок Pepe">
+                                                <span class="char-icon">🐸</span>
+                                                <span class="char-label">Пепе</span>
+                                            </button>
+                                            <button type="button" class="character-btn" data-character="ghost" title="Привидение Clyde">
+                                                <span class="char-icon">👻</span>
+                                                <span class="char-label">Призрак</span>
+                                            </button>
+                                            <button type="button" class="character-btn" data-character="skeleton" title="Скелетон">
+                                                <span class="char-icon">💀</span>
+                                                <span class="char-label">Скелет</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div class="wardrobe-field">
                                         <label>Шапка / Причёска:</label>
                                         <div class="hat-selector">
@@ -325,7 +355,7 @@
                         <div class="lobby-version-left">
                             <span class="footer-dot-live"></span>
                             <span class="lobby-footer-label">Версия:</span>
-                            <span id="lobby-version-badge" class="version-badge" title="Сведения о версии">v1.4.1</span>
+                            <span id="lobby-version-badge" class="version-badge" title="Сведения о версии">v1.5.0</span>
                         </div>
                         <div class="lobby-version-right">
                             <span id="lobby-build-date" class="lobby-build-tag">25.10.2026</span>
@@ -653,7 +683,7 @@
                         <polyline points="16 18 22 12 16 6"></polyline>
                         <polyline points="8 6 2 12 8 18"></polyline>
                     </svg>
-                    <span>WebRTC DevTools <span id="dev-header-version" class="dev-version-badge">v1.4.1</span></span>
+                    <span>WebRTC DevTools <span id="dev-header-version" class="dev-version-badge">v1.5.0</span></span>
                 </div>
                 <button id="close-dev-btn" class="close-icon-btn" title="Закрыть">✕</button>
             </div>
@@ -760,6 +790,35 @@
                             </div>
                             <!-- Секция персонажа -->
                             <div id="modal-cartoon-section" class="wardrobe-section">
+                                    <div class="wardrobe-field">
+                                        <label>Персонаж / Стиль:</label>
+                                        <div class="character-selector">
+                                            <button type="button" class="character-btn active" data-character="southpark" title="Южный Парк (Канадец)">
+                                                <span class="char-icon">🍁</span>
+                                                <span class="char-label">Канадец</span>
+                                            </button>
+                                            <button type="button" class="character-btn" data-character="popcat" title="Pop Cat (Мемный кот)">
+                                                <span class="char-icon">🐱</span>
+                                                <span class="char-label">Pop Cat</span>
+                                            </button>
+                                            <button type="button" class="character-btn" data-character="robot" title="Робот B-42">
+                                                <span class="char-icon">🤖</span>
+                                                <span class="char-label">Робот</span>
+                                            </button>
+                                            <button type="button" class="character-btn" data-character="frog" title="Лягушонок Pepe">
+                                                <span class="char-icon">🐸</span>
+                                                <span class="char-label">Пепе</span>
+                                            </button>
+                                            <button type="button" class="character-btn" data-character="ghost" title="Привидение Clyde">
+                                                <span class="char-icon">👻</span>
+                                                <span class="char-label">Призрак</span>
+                                            </button>
+                                            <button type="button" class="character-btn" data-character="skeleton" title="Скелетон">
+                                                <span class="char-icon">💀</span>
+                                                <span class="char-label">Скелет</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 <div class="wardrobe-field">
                                     <label>Шапка / Причёска:</label>
                                     <div class="hat-selector">
@@ -1056,26 +1115,34 @@
                     <div class="version-highlight-card">
                         <div class="vh-main">
                             <span class="vh-name">P2P Видеозвонок</span>
-                            <span id="modal-app-version" class="version-badge lg">v1.4.1</span>
+                            <span id="modal-app-version" class="version-badge lg">v1.5.0</span>
                         </div>
                         <div class="vh-meta">
                             <span>Дата сборки: <strong id="modal-build-date">25.10.2026</strong></span>
                             <span>Сборка: <code id="modal-build-id">20261025-r2</code></span>
                         </div>
                     </div>
-                    <div class="version-features-list">
-                        <h5>Функционал версии v1.2.0:</h5>
+                                        <div class="version-features-list">
+                        <h5>Функционал актуальной версии v1.5.0:</h5>
                         <ul>
-                            <li><strong>🚫 Режим «Без аватара» (классический режим):</strong> возможность полностью выключить говорящего персонажа как у себя (без движения рта и покачиваний головы), так и скрыть анимированные аватары собеседников</li>
-                            <li><strong>✏️ Рисование на экране (Screen Annotations):</strong> живые аннотации поверх демонстрации экрана в реальном времени через P2P DataChannel! Исчезающие чернила (тают за 2.5 сек), неоновая лазерная указка со шлейфом, постоянный маркер и плавающий остров инструментов</li>
-                            <li><strong>🖥️ Пресеты демонстрации экрана:</strong> выбор качества («Эконом» 15 FPS / ~800 кбит/с, «Стандарт» 30 FPS / ~2.5 Мбит/с, «Игры / Ультра» 60 FPS / ~7 Мбит/с), переключение на лету без перезапуска, WebRTC оптимизация detail/motion и передача звука системы</li>
-                            <li><strong>🖼️ Своё фото вместо аватара:</strong> загрузка любой фотографии/картинки с интерактивным зелёным ореолом в такт речи</li>
-                            <li><strong>🎭 Смена внешности во время звонка:</strong> кнопка «Аватар» в панели управления и горячая клавиша (A) для мгновенной смены образа</li>
-                            <li><strong>⚡ P2P WebRTC:</strong> прямое соединение mesh без сервера (сжатие SDP токенов)</li>
-                            <li><strong>🎨 Умная совместная доска (Whiteboard):</strong> гладкие кривые Безье вместо ломаных углов, геометрические фигуры (⭕ идеальный круг/овал с Shift, ⬜ прямоугольник, ➡️ стрелка для блок-схем, 📏 прямая линия) с живым интерактивным превью, сохранение, отправка в чат звонка и режим PiP</li>
-                            <li><strong>🎭 Анимированный аватар:</strong> синхронизация речи и рта с микрофоном, гардероб и мемная шапка-ушанка РФ с кокардой</li>
-                            <li><strong>🚀 Сверхбыстрая P2P передача файлов:</strong> передача бинарными ArrayBuffer (64 КБ) без Base64, аппаратный контроль буфера WebRTC SCTP (до 50–80+ МБ/с) и спидометр в реальном времени</li>
-                            <li><strong>🤝 Автопроверка версий:</strong> контроль совместимости версий клиентов при созвоне</li>
+                            <li><strong>🎭 Новая коллекция говорящих аватаров (6 персонажей):</strong>
+                                <br>• 🍁 <strong>Южный Парк (Канадец):</strong> легендарный хлопающий рот с поддержкой шапок (ушанка РФ с кокардой, кепка, вязаная шапка, хохолок, лысый)
+                                <br>• 🐱 <strong>Pop Cat:</strong> культовый мемный кот с пропорционально открывающимся круглым ртом «О», прижимающимися ушками и бликами глаз
+                                <br>• 🤖 <strong>Робот B-42:</strong> ретро-киборг с живой спектрограммой-эквалайзером вместо рта, мигающей неоновой антенной и пиксельными HUD-глазами
+                                <br>• 🐸 <strong>Лягушонок Pepe:</strong> мемный лягушонок с выпученными глазами на макушке и отвисающей широкой мультяшной челюстью
+                                <br>• 👻 <strong>Привидение Clyde:</strong> парящий в воздухе неоновый призрак с плавающей синусоидальной левитацией и удивлённым овальным ртом
+                                <br>• 💀 <strong>Скелетон:</strong> клацающий челюстью череп с горящими огоньками в глазницах
+                            </li>
+                            <li><strong>📹 Встроенная запись звонков (2 режима):</strong>
+                                <br>• <strong>Только звук:</strong> аппаратный Opus WebM микшер локального микрофона и входящего звука
+                                <br>• <strong>Видео и звук HD 720p 30 FPS:</strong> запись всего созвона, аватаров, реакций и интерактивной доски с сохранением кадров при переключении вкладки в фон
+                            </li>
+                            <li><strong>✨ Аутентичное лого Discord Clyde:</strong> фирменный маскот в шапке и векторная иконка на вкладке GitHub Pages</li>
+                            <li><strong>🧪 WebRTC DevTools & Тест-звонок:</strong> симуляция виртуальной веб-камеры и говорящего собеседника для отладки интерфейса</li>
+                            <li><strong>✏️ Рисование на экране (Screen Annotations):</strong> исчезающие чернила, лазерная указка и постоянный маркер поверх трансляции экрана</li>
+                            <li><strong>🖥️ Пресеты демонстрации экрана:</strong> Эконом (15 FPS), Стандарт (30 FPS) и Игры/Ультра (60 FPS) с переключением на лету без прерывания</li>
+                            <li><strong>🎨 Совместная доска (Whiteboard):</strong> гладкие кривые Безье, геометрические фигуры (овал, прямоугольник, стрелка, линия) и режим PiP</li>
+                            <li><strong>🚀 Прямая P2P передача файлов:</strong> передача данных через бинарные ArrayBuffer со спидометром скорости (до 80+ МБ/с)</li>
                         </ul>
                     </div>
                 </div>

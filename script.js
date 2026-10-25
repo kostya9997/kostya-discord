@@ -1,7 +1,7 @@
 // === КОНФИГУРАЦИЯ И ВЕРСИОНИРОВАНИЕ ПРИЛОЖЕНИЯ ===
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.5.0';
 const APP_BUILD_DATE = '25.10.2026';
-const APP_BUILD_ID = '20261025-r2';
+const APP_BUILD_ID = '20261025-r3';
 
 // Делаем версию доступной в глобальном контексте window для удобной отладки в консоли
 window.APP_VERSION = APP_VERSION;
@@ -190,6 +190,7 @@ const chatFileInput = document.getElementById('chat-file-input');
 const defaultAvatarProfile = {
     name: 'Вы',
     suitColor: '#5865f2',
+    character: 'southpark', // 'southpark' | 'popcat' | 'robot' | 'frog' | 'ghost' | 'skeleton'
     hatStyle: 'ushanka', // 'tuft' | 'beanie' | 'ushanka' | 'cap' | 'bald'
     mode: 'cartoon',     // 'cartoon' | 'photo' | 'disabled'
     photoDataUrl: null,  // data:image/... base64
@@ -389,8 +390,160 @@ async function getValidSdp(rawText, isOffer) {
     return JSON.stringify({ type: isOffer ? 'offer' : 'answer', sdp });
 }
 
-// === МЕМНЫЙ АВАТАР (ИНТЕРАКТИВНЫЙ РИСОВАННЫЙ СТИЛЬ) ===
-function drawCartoonCharacter(ctx, options) {
+// ==========================================================================
+// КОЛЛЕКЦИЯ ГОВОРЯЩИХ АВАТАРОВ (МУЛЬТЯШНЫЕ СТИЛИ НА HTML5 CANVAS)
+// ==========================================================================
+
+// Вспомогательная отрисовка шапок/причёсок
+function drawCharacterHat(ctx, cx, headTopY, hatStyle, suitColor, hairColor = '#3d2817') {
+    if (hatStyle === 'tuft') {
+        ctx.beginPath();
+        ctx.moveTo(cx - 24, headTopY + 4);
+        ctx.quadraticCurveTo(cx - 12, headTopY - 26, cx, headTopY - 14);
+        ctx.quadraticCurveTo(cx + 14, headTopY - 28, cx + 20, headTopY + 5);
+        ctx.fillStyle = hairColor;
+        ctx.fill();
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+    } else if (hatStyle === 'beanie') {
+        // Вязаная шапка с помпоном
+        ctx.beginPath();
+        ctx.ellipse(cx, headTopY + 12, 54, 40, 0, Math.PI, 0);
+        ctx.fillStyle = suitColor || '#3498db';
+        ctx.fill();
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        // Отворот
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(cx - 56, headTopY - 2, 112, 20, 5);
+        } else {
+            ctx.rect(cx - 56, headTopY - 2, 112, 20);
+        }
+        ctx.fillStyle = '#f1c40f';
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        // Помпон
+        const pomY = headTopY - 32;
+        ctx.beginPath();
+        ctx.arc(cx, pomY, 15, 0, Math.PI * 2);
+        ctx.fillStyle = '#f1c40f';
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+    } else if (hatStyle === 'ushanka') {
+        // Медвежья шапка-ушанка РФ с кокардой
+        const furColor = '#5e381e';
+        const furInner = '#ab7145';
+        const crownColor = '#3a2111';
+
+        // Медвежьи ушки
+        ctx.beginPath();
+        ctx.arc(cx - 36, headTopY - 6, 15, 0, Math.PI * 2);
+        ctx.fillStyle = furColor;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx - 36, headTopY - 6, 8, 0, Math.PI * 2);
+        ctx.fillStyle = furInner;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(cx + 36, headTopY - 6, 15, 0, Math.PI * 2);
+        ctx.fillStyle = furColor;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx + 36, headTopY - 6, 8, 0, Math.PI * 2);
+        ctx.fillStyle = furInner;
+        ctx.fill();
+
+        // Купол
+        ctx.beginPath();
+        ctx.ellipse(cx, headTopY + 14, 56, 42, 0, Math.PI, 0);
+        ctx.fillStyle = crownColor;
+        ctx.fill();
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        // Боковые висящие уши
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(cx - 62, headTopY + 6, 22, 50, 8) : ctx.rect(cx - 62, headTopY + 6, 22, 50);
+        ctx.fillStyle = furColor;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(cx + 40, headTopY + 6, 22, 50, 8) : ctx.rect(cx + 40, headTopY + 6, 22, 50);
+        ctx.fillStyle = furColor;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        // Лобная планка
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(cx - 44, headTopY - 2, 88, 26, 6) : ctx.rect(cx - 44, headTopY - 2, 88, 26);
+        ctx.fillStyle = furColor;
+        ctx.fill();
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        // Красная звезда
+        const starX = cx;
+        const starY = headTopY + 11;
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+            const rot = (Math.PI / 2) * 3 + (i * Math.PI) / 2.5;
+            const x1 = starX + Math.cos(rot) * 7;
+            const y1 = starY + Math.sin(rot) * 7;
+            ctx.lineTo(x1, y1);
+            const rotInner = rot + Math.PI / 5;
+            const x2 = starX + Math.cos(rotInner) * 3.5;
+            const y2 = starY + Math.sin(rotInner) * 3.5;
+            ctx.lineTo(x2, y2);
+        }
+        ctx.closePath();
+        ctx.fillStyle = '#ed4245';
+        ctx.fill();
+    } else if (hatStyle === 'cap') {
+        // Кепка
+        ctx.beginPath();
+        ctx.ellipse(cx, headTopY + 12, 52, 36, 0, Math.PI, 0);
+        ctx.fillStyle = suitColor || '#e74c3c';
+        ctx.fill();
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        // Козырек
+        ctx.beginPath();
+        ctx.ellipse(cx + 16, headTopY + 14, 50, 14, 0.15, 0, Math.PI * 2);
+        ctx.fillStyle = '#2c3e50';
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+    }
+}
+
+// 1. 🍁 ЮЖНЫЙ ПАРК (Хлопающая пополам голова)
+function drawSouthParkCharacter(ctx, options) {
     const {
         cx,
         cy,
@@ -399,12 +552,7 @@ function drawCartoonCharacter(ctx, options) {
         suitColor = '#5865f2',
         hairColor = '#3d2817',
         skinColor = '#fcdbbd',
-        nameTag = '',
-        volumeLevel = 0,
-        isMuted = false,
-        hatStyle = 'tuft',
-        scale = 1.0,
-        isMiniPreview = false,
+        hatStyle = 'ushanka',
     } = options;
 
     const headRadiusX = 72;
@@ -413,16 +561,7 @@ function drawCartoonCharacter(ctx, options) {
     const maxMouthLift = 34;
     const mouthLift = Math.max(0, Math.min(1.0, mouthOpen)) * maxMouthLift;
 
-    ctx.save();
-
-    // Масштабирование вокруг собственного центра персонажа (для миниатюры гардероба)
-    if (scale && scale !== 1.0) {
-        ctx.translate(cx, cy);
-        ctx.scale(scale, scale);
-        ctx.translate(-cx, -cy);
-    }
-
-    // 1. ТЕЛО / ПЛЕЧИ
+    // 1. Тело / Плечи
     ctx.beginPath();
     ctx.ellipse(cx, cy + 145, 120, 85, 0, Math.PI, 0);
     ctx.lineTo(cx + 120, cy + 240);
@@ -458,25 +597,16 @@ function drawCartoonCharacter(ctx, options) {
     ctx.strokeStyle = '#000000';
     ctx.stroke();
 
-    // Вычисляем точную дугу и ширину в месте разреза рта (mouthLineY)
-    const thetaMouth = Math.asin(
-        Math.max(-0.99, Math.min(0.99, (mouthLineY - cy) / headRadiusY)),
-    );
+    const thetaMouth = Math.asin(Math.max(-0.99, Math.min(0.99, (mouthLineY - cy) / headRadiusY)));
     const mouthCutX = headRadiusX * Math.cos(thetaMouth);
 
-    // 2. ВНУТРЕННОСТЬ РТА (видна, когда челюсть раздвигается)
+    // 2. Внутренность рта
     if (mouthLift > 1) {
         ctx.beginPath();
-        ctx.rect(
-            cx - mouthCutX + 2,
-            mouthLineY - mouthLift,
-            (mouthCutX - 2) * 2,
-            mouthLift + 4,
-        );
+        ctx.rect(cx - mouthCutX + 2, mouthLineY - mouthLift, (mouthCutX - 2) * 2, mouthLift + 4);
         ctx.fillStyle = '#160202';
         ctx.fill();
 
-        // Язык
         ctx.beginPath();
         ctx.arc(cx, mouthLineY + 2, 22, Math.PI, 0);
         ctx.fillStyle = '#ff6b81';
@@ -486,18 +616,9 @@ function drawCartoonCharacter(ctx, options) {
         ctx.stroke();
     }
 
-    // 3. НИЖНЯЯ ЧЕЛЮСТЬ (НЕПОДВИЖНАЯ, ЧИСТЫЙ КОНТУР БЕЗ БОКОВЫХ ПАЛОК)
+    // 3. Нижняя челюсть
     ctx.beginPath();
-    ctx.ellipse(
-        cx,
-        cy,
-        headRadiusX,
-        headRadiusY,
-        0,
-        thetaMouth,
-        Math.PI - thetaMouth,
-        false,
-    );
+    ctx.ellipse(cx, cy, headRadiusX, headRadiusY, 0, thetaMouth, Math.PI - thetaMouth, false);
     ctx.lineTo(cx + mouthCutX, mouthLineY);
     ctx.closePath();
     ctx.fillStyle = skinColor;
@@ -506,21 +627,12 @@ function drawCartoonCharacter(ctx, options) {
     ctx.strokeStyle = '#000000';
     ctx.stroke();
 
-    // 4. ВЕРХНЯЯ ПОЛОВИНА ГОЛОВЫ (ШЛЁПАЕТ ВВЕРХ-ВНИЗ)
+    // 4. Верхняя половина головы
     ctx.save();
     ctx.translate(0, -mouthLift);
 
     ctx.beginPath();
-    ctx.ellipse(
-        cx,
-        cy,
-        headRadiusX,
-        headRadiusY,
-        0,
-        Math.PI - thetaMouth,
-        2 * Math.PI + thetaMouth,
-        false,
-    );
+    ctx.ellipse(cx, cy, headRadiusX, headRadiusY, 0, Math.PI - thetaMouth, 2 * Math.PI + thetaMouth, false);
     ctx.lineTo(cx - mouthCutX, mouthLineY);
     ctx.closePath();
     ctx.fillStyle = skinColor;
@@ -529,12 +641,9 @@ function drawCartoonCharacter(ctx, options) {
     ctx.strokeStyle = '#000000';
     ctx.stroke();
 
-    // Глаза-точки
     const eyeOffsetX = 26;
     const eyeY = cy - 10;
-
     if (isBlinking) {
-        // Моргание: горизонтальные полоски
         ctx.lineWidth = 3.5;
         ctx.strokeStyle = '#000000';
         ctx.beginPath();
@@ -544,14 +653,12 @@ function drawCartoonCharacter(ctx, options) {
         ctx.lineTo(cx + eyeOffsetX + 9, eyeY);
         ctx.stroke();
     } else {
-        // Черные круглые глазки
         ctx.fillStyle = '#000000';
         ctx.beginPath();
         ctx.arc(cx - eyeOffsetX, eyeY, 6, 0, Math.PI * 2);
         ctx.arc(cx + eyeOffsetX, eyeY, 6, 0, Math.PI * 2);
         ctx.fill();
 
-        // Белые блики
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(cx - eyeOffsetX + 2, eyeY - 2, 2, 0, Math.PI * 2);
@@ -570,453 +677,701 @@ function drawCartoonCharacter(ctx, options) {
     ctx.lineTo(cx + eyeOffsetX + 10, eyeY - 14 - browTilt);
     ctx.stroke();
 
-    // ШАПКА / ПРИЧЕСКА АВАТАРА
-    if (hatStyle === 'tuft') {
-        // 1. Классический забавный хохолок
-        ctx.beginPath();
-        ctx.moveTo(cx - 30, cy - headRadiusY + 4);
-        ctx.quadraticCurveTo(
-            cx - 15,
-            cy - headRadiusY - 28,
-            cx,
-            cy - headRadiusY - 16,
-        );
-        ctx.quadraticCurveTo(
-            cx + 15,
-            cy - headRadiusY - 32,
-            cx + 25,
-            cy - headRadiusY + 6,
-        );
-        ctx.fillStyle = hairColor;
-        ctx.fill();
-        ctx.lineWidth = 3.5;
+    // Шапка
+    drawCharacterHat(ctx, cx, cy - headRadiusY, hatStyle, suitColor, hairColor);
+
+    ctx.restore();
+}
+
+// 2. 🐱 POP CAT (Мемный котик)
+function drawPopCatCharacter(ctx, options) {
+    const {
+        cx,
+        cy,
+        mouthOpen = 0,
+        isBlinking = false,
+        suitColor = '#5865f2',
+        hatStyle = 'bald',
+    } = options;
+
+    const isLoud = mouthOpen > 0.35;
+    const earTwitch = isLoud ? 0.08 : 0;
+
+    // Плечи / основание
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 145, 115, 80, 0, Math.PI, 0);
+    ctx.lineTo(cx + 115, cy + 240);
+    ctx.lineTo(cx - 115, cy + 240);
+    ctx.closePath();
+    ctx.fillStyle = suitColor;
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Ушки котика
+    // Левое ушко
+    ctx.save();
+    ctx.translate(cx - 50, cy - 40);
+    ctx.rotate(-earTwitch);
+    ctx.beginPath();
+    ctx.moveTo(-25, 20);
+    ctx.lineTo(-35, -55);
+    ctx.lineTo(25, -15);
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+    // Розовая серединка
+    ctx.beginPath();
+    ctx.moveTo(-18, 15);
+    ctx.lineTo(-26, -42);
+    ctx.lineTo(16, -10);
+    ctx.closePath();
+    ctx.fillStyle = '#ffb6c1';
+    ctx.fill();
+    ctx.restore();
+
+    // Правое ушко
+    ctx.save();
+    ctx.translate(cx + 50, cy - 40);
+    ctx.rotate(earTwitch);
+    ctx.beginPath();
+    ctx.moveTo(25, 20);
+    ctx.lineTo(35, -55);
+    ctx.lineTo(-25, -15);
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+    // Розовая серединка
+    ctx.beginPath();
+    ctx.moveTo(18, 15);
+    ctx.lineTo(26, -42);
+    ctx.lineTo(-16, -10);
+    ctx.closePath();
+    ctx.fillStyle = '#ffb6c1';
+    ctx.fill();
+    ctx.restore();
+
+    // Круглая голова котика
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 10, 84, 76, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Большие выразительные глаза Pop Cat
+    const eyeOffsetX = 34;
+    const eyeY = cy - 12;
+
+    if (isBlinking) {
+        ctx.lineWidth = 4;
         ctx.strokeStyle = '#000000';
-        ctx.stroke();
-    } else if (hatStyle === 'beanie') {
-        // 2. Вязаная шапка с помпоном
-        // Купол
         ctx.beginPath();
-        ctx.ellipse(
-            cx,
-            cy - 25,
-            headRadiusX + 4,
-            headRadiusY - 14,
-            0,
-            Math.PI,
-            0,
-        );
-        ctx.fillStyle = '#3498db';
-        ctx.fill();
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = '#000000';
+        ctx.arc(cx - eyeOffsetX, eyeY + 2, 12, Math.PI, 0, true);
         ctx.stroke();
-
-        // Отворот
         ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(
-                cx - headRadiusX - 5,
-                cy - 42,
-                (headRadiusX + 5) * 2,
-                24,
-                6,
-            );
-        } else {
-            ctx.rect(cx - headRadiusX - 5, cy - 42, (headRadiusX + 5) * 2, 24);
-        }
-        ctx.fillStyle = '#f1c40f';
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#000000';
+        ctx.arc(cx + eyeOffsetX, eyeY + 2, 12, Math.PI, 0, true);
         ctx.stroke();
-
-        // Полоски вязки
+    } else {
+        // Большие черные зрачки с бликами
+        ctx.fillStyle = '#111111';
         ctx.beginPath();
-        ctx.lineWidth = 2;
-        for (let x = cx - headRadiusX + 8; x < cx + headRadiusX; x += 16) {
-            ctx.moveTo(x, cy - 42);
-            ctx.lineTo(x, cy - 18);
-        }
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-        ctx.stroke();
-
-        // Пушистый помпон
-        const pompomY = cy - headRadiusY - 18;
-        ctx.beginPath();
-        ctx.arc(cx, pompomY, 17, 0, Math.PI * 2);
-        ctx.fillStyle = '#f1c40f';
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.lineWidth = 2;
-        ctx.moveTo(cx - 10, pompomY - 8);
-        ctx.lineTo(cx + 10, pompomY + 8);
-        ctx.moveTo(cx + 10, pompomY - 8);
-        ctx.lineTo(cx - 10, pompomY + 8);
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.stroke();
-    } else if (hatStyle === 'ushanka') {
-        // === 3. НАСТОЯЩАЯ МЕДВЕЖЬЯ ШАПКА-УШАНКА РФ (МЕМНАЯ И АУТЕНТИЧНАЯ) ===
-        const furColor = '#5e381e'; // Густой медвежий бурый мех
-        const furDark = '#3d2210'; // Тень меха / контур
-        const furLight = '#85542f'; // Светлый теплый подшерсток / меховой акцент
-        const furInner = '#ab7145'; // Внутренняя часть медвежьих ушек
-        const crownColor = '#3a2111'; // Плотный кожано-меховой купол шапки
-
-        // 1. МЕДВЕЖЬИ КРУГЛЫЕ УШКИ СВЕРХУ (ДЛЯ НАСТОЯЩЕЙ МЕДВЕЖЬЕЙ МЕМНОСТИ)
-        const bearEarOffsetX = 44;
-        const bearEarY = cy - headRadiusY + 4;
-        const bearEarRadius = 19;
-
-        // Левое медвежье ушко
-        ctx.beginPath();
-        ctx.arc(cx - bearEarOffsetX, bearEarY, bearEarRadius, 0, Math.PI * 2);
-        ctx.fillStyle = furColor;
-        ctx.fill();
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-
-        // Внутреннее светлое ушко медведя (левое)
-        ctx.beginPath();
-        ctx.arc(
-            cx - bearEarOffsetX,
-            bearEarY + 1,
-            bearEarRadius * 0.55,
-            0,
-            Math.PI * 2,
-        );
-        ctx.fillStyle = furInner;
+        ctx.arc(cx - eyeOffsetX, eyeY, 17, 0, Math.PI * 2);
+        ctx.arc(cx + eyeOffsetX, eyeY, 17, 0, Math.PI * 2);
         ctx.fill();
 
-        // Правое медвежье ушко
+        // Верхний крупный блик
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(cx + bearEarOffsetX, bearEarY, bearEarRadius, 0, Math.PI * 2);
-        ctx.fillStyle = furColor;
-        ctx.fill();
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-
-        // Внутреннее светлое ушко медведя (правое)
-        ctx.beginPath();
-        ctx.arc(
-            cx + bearEarOffsetX,
-            bearEarY + 1,
-            bearEarRadius * 0.55,
-            0,
-            Math.PI * 2,
-        );
-        ctx.fillStyle = furInner;
+        ctx.arc(cx - eyeOffsetX - 4, eyeY - 5, 5.5, 0, Math.PI * 2);
+        ctx.arc(cx + eyeOffsetX - 4, eyeY - 5, 5.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Ворсинки меха на кончиках медвежьих ушек
+        // Нижний мелкий блик
         ctx.beginPath();
-        ctx.strokeStyle = furDark;
-        ctx.lineWidth = 2;
-        ctx.moveTo(cx - bearEarOffsetX - 8, bearEarY - bearEarRadius + 2);
-        ctx.lineTo(cx - bearEarOffsetX - 12, bearEarY - bearEarRadius - 3);
-        ctx.moveTo(cx - bearEarOffsetX + 2, bearEarY - bearEarRadius + 1);
-        ctx.lineTo(cx - bearEarOffsetX + 4, bearEarY - bearEarRadius - 4);
-        ctx.moveTo(cx + bearEarOffsetX + 8, bearEarY - bearEarRadius + 2);
-        ctx.lineTo(cx + bearEarOffsetX + 12, bearEarY - bearEarRadius - 3);
-        ctx.moveTo(cx + bearEarOffsetX - 2, bearEarY - bearEarRadius + 1);
-        ctx.lineTo(cx + bearEarOffsetX - 4, bearEarY - bearEarRadius - 4);
-        ctx.stroke();
-
-        // 2. БОКОВЫЕ МЕХОВЫЕ "УШИ" ШАПКИ-УШАНКИ (ОПУЩЕНЫ ВНИЗ, ПУШИСТЫЕ)
-        const earFlapW = 28;
-        const earFlapH = 76;
-        const leftEarX = cx - headRadiusX - 12;
-        const rightEarX = cx + headRadiusX - 16;
-        const earFlapY = cy - 28;
-
-        function drawUshankaFlap(x, y, w, h, isLeft) {
-            ctx.save();
-            // Внешний контур уха
-            ctx.beginPath();
-            if (ctx.roundRect) {
-                ctx.roundRect(x, y, w, h, [10, 10, 16, 16]);
-            } else {
-                ctx.rect(x, y, w, h);
-            }
-            ctx.fillStyle = furColor;
-            ctx.fill();
-            ctx.lineWidth = 3.5;
-            ctx.strokeStyle = '#000000';
-            ctx.stroke();
-
-            // Внутренний пушистый теплый подшерсток
-            ctx.beginPath();
-            const pad = 4;
-            if (ctx.roundRect) {
-                ctx.roundRect(
-                    x + pad,
-                    y + pad,
-                    w - pad * 2,
-                    h - pad * 2,
-                    [6, 6, 12, 12],
-                );
-            } else {
-                ctx.rect(x + pad, y + pad, w - pad * 2, h - pad * 2);
-            }
-            ctx.fillStyle = furLight;
-            ctx.fill();
-
-            // Пушистые ворсинки меха по внешнему ребру
-            ctx.beginPath();
-            ctx.strokeStyle = furDark;
-            ctx.lineWidth = 2.2;
-            const tuftDir = isLeft ? -1 : 1;
-            const edgeX = isLeft ? x : x + w;
-            for (let fy = y + 14; fy < y + h - 10; fy += 10) {
-                ctx.moveTo(edgeX, fy);
-                ctx.lineTo(edgeX + tuftDir * 6, fy + 4);
-            }
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        drawUshankaFlap(leftEarX, earFlapY, earFlapW, earFlapH, true);
-        drawUshankaFlap(rightEarX, earFlapY, earFlapW, earFlapH, false);
-
-        // 3. ЗАВЯЗКИ / ТЕСЁМКИ С ПУШИСТЫМИ БУБОНАМИ (СВИСАЮТ ВНИЗ)
-        const cordStartY = earFlapY + earFlapH;
-        const leftCordX = leftEarX + earFlapW / 2;
-        ctx.beginPath();
-        ctx.moveTo(leftCordX, cordStartY);
-        ctx.bezierCurveTo(
-            leftCordX - 6,
-            cordStartY + 18,
-            leftCordX + 8,
-            cordStartY + 30,
-            leftCordX - 3,
-            cordStartY + 42,
-        );
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = '#2b170a';
-        ctx.stroke();
-
-        // Левый помпон/бубон
-        ctx.beginPath();
-        ctx.arc(leftCordX - 3, cordStartY + 44, 6.5, 0, Math.PI * 2);
-        ctx.fillStyle = furLight;
-        ctx.fill();
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-
-        const rightCordX = rightEarX + earFlapW / 2;
-        ctx.beginPath();
-        ctx.moveTo(rightCordX, cordStartY);
-        ctx.bezierCurveTo(
-            rightCordX + 6,
-            cordStartY + 18,
-            rightCordX - 8,
-            cordStartY + 30,
-            rightCordX + 3,
-            cordStartY + 42,
-        );
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = '#2b170a';
-        ctx.stroke();
-
-        // Правый помпон/бубон
-        ctx.beginPath();
-        ctx.arc(rightCordX + 3, cordStartY + 44, 6.5, 0, Math.PI * 2);
-        ctx.fillStyle = furLight;
-        ctx.fill();
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-
-        // 4. ОСНОВНОЙ КУПОЛ ШАПКИ (ТУЛЬЯ)
-        ctx.beginPath();
-        ctx.ellipse(
-            cx,
-            cy - 24,
-            headRadiusX + 6,
-            headRadiusY - 14,
-            0,
-            Math.PI,
-            0,
-        );
-        ctx.fillStyle = crownColor;
-        ctx.fill();
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-
-        // Характерные клиновые швы на куполе ушанки
-        ctx.beginPath();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
-        ctx.moveTo(cx, cy - headRadiusY + 12);
-        ctx.lineTo(cx, cy - 44);
-        ctx.moveTo(cx - 38, cy - headRadiusY + 28);
-        ctx.quadraticCurveTo(cx - 22, cy - 54, cx - 18, cy - 44);
-        ctx.moveTo(cx + 38, cy - headRadiusY + 28);
-        ctx.quadraticCurveTo(cx + 22, cy - 54, cx + 18, cy - 44);
-        ctx.stroke();
-
-        // 5. ПЕРЕДНИЙ МЕХОВОЙ НАЛОБНИК (ОТВОРОТ)
-        const visorW = 104;
-        const visorH = 32;
-        const visorX = cx - visorW / 2;
-        const visorY = cy - 54;
-
-        ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(visorX, visorY, visorW, visorH, [12, 12, 6, 6]);
-        } else {
-            ctx.rect(visorX, visorY, visorW, visorH);
-        }
-        ctx.fillStyle = furColor;
-        ctx.fill();
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-
-        // Внутренний светлый мех отворота
-        ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(
-                visorX + 4,
-                visorY + 4,
-                visorW - 8,
-                visorH - 8,
-                [8, 8, 4, 4],
-            );
-        } else {
-            ctx.rect(visorX + 4, visorY + 4, visorW - 8, visorH - 8);
-        }
-        ctx.fillStyle = furLight;
-        ctx.fill();
-
-        // Ворсинки меха по верхнему краю отворота
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(255, 235, 205, 0.35)';
-        ctx.lineWidth = 2;
-        for (let fx = visorX + 12; fx < visorX + visorW - 10; fx += 14) {
-            ctx.moveTo(fx, visorY + 4);
-            ctx.lineTo(fx + 3, visorY + 10);
-        }
-        ctx.stroke();
-
-        // 6. АУТЕНТИЧНАЯ АРМЕЙСКАЯ КОКАРДА РФ (ЗОЛОТОЙ ВЕНОК + КРАСНАЯ ЗВЕЗДА)
-        const badgeCx = cx;
-        const badgeCy = cy - 39;
-
-        // Золотая рифленая основа кокарды
-        ctx.beginPath();
-        ctx.ellipse(badgeCx, badgeCy, 13, 15, 0, 0, Math.PI * 2);
-        ctx.fillStyle = '#f1c40f';
-        ctx.fill();
-        ctx.lineWidth = 2.2;
-        ctx.strokeStyle = '#b7950b';
-        ctx.stroke();
-
-        // Насечки-лучи по краю кокарды
-        ctx.beginPath();
-        ctx.strokeStyle = '#9a7d0a';
-        ctx.lineWidth = 1.3;
-        for (let i = 0; i < 8; i++) {
-            const angle = (i * Math.PI) / 4;
-            ctx.moveTo(
-                badgeCx + Math.cos(angle) * 8.5,
-                badgeCy + Math.sin(angle) * 10,
-            );
-            ctx.lineTo(
-                badgeCx + Math.cos(angle) * 12.5,
-                badgeCy + Math.sin(angle) * 14.5,
-            );
-        }
-        ctx.stroke();
-
-        // Настоящая пятиконечная красная рубиновая звезда РФ/СССР
-        ctx.beginPath();
-        const starOuterR = 8.5;
-        const starInnerR = 3.6;
-        const starPoints = 5;
-        for (let i = 0; i < starPoints * 2; i++) {
-            const r = i % 2 === 0 ? starOuterR : starInnerR;
-            const a = (i * Math.PI) / starPoints - Math.PI / 2;
-            const px = badgeCx + Math.cos(a) * r;
-            const py = badgeCy + Math.sin(a) * r;
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.fillStyle = '#e74c3c';
-        ctx.fill();
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = '#781207';
-        ctx.stroke();
-
-        // Золотая центральная заклепка
-        ctx.beginPath();
-        ctx.arc(badgeCx, badgeCy, 1.8, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffd700';
-        ctx.fill();
-    } else if (hatStyle === 'cap') {
-        // 4. Стильная кепка с козырьком
-        ctx.beginPath();
-        ctx.ellipse(
-            cx,
-            cy - 25,
-            headRadiusX + 3,
-            headRadiusY - 16,
-            0,
-            Math.PI,
-            0,
-        );
-        ctx.fillStyle = '#e67e22';
-        ctx.fill();
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-
-        // Пуговица
-        ctx.beginPath();
-        ctx.arc(cx, cy - headRadiusY + 12, 6, 0, Math.PI * 2);
-        ctx.fillStyle = '#d35400';
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-
-        // Козырек
-        ctx.beginPath();
-        ctx.moveTo(cx - 25, cy - 22);
-        ctx.quadraticCurveTo(cx + 45, cy - 38, cx + headRadiusX + 34, cy - 12);
-        ctx.quadraticCurveTo(cx + 42, cy - 6, cx - 12, cy - 18);
-        ctx.closePath();
-        ctx.fillStyle = '#d35400';
-        ctx.fill();
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = '#000000';
-        ctx.stroke();
-    } else if (hatStyle === 'bald') {
-        // 5. Лысый персонаж с забавным бликом
-        ctx.beginPath();
-        ctx.ellipse(cx - 28, cy - 48, 12, 6, -Math.PI / 4, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.arc(cx - eyeOffsetX + 5, eyeY + 5, 2.5, 0, Math.PI * 2);
+        ctx.arc(cx + eyeOffsetX + 5, eyeY + 5, 2.5, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Розовые щечки
-    ctx.fillStyle = 'rgba(255, 120, 120, 0.28)';
+    // Розовый треугольный носик
     ctx.beginPath();
-    ctx.arc(cx - 48, cy + 4, 10, 0, Math.PI * 2);
-    ctx.arc(cx + 48, cy + 4, 10, 0, Math.PI * 2);
+    ctx.moveTo(cx - 7, cy + 12);
+    ctx.lineTo(cx + 7, cy + 12);
+    ctx.lineTo(cx, cy + 20);
+    ctx.closePath();
+    ctx.fillStyle = '#ff8fa3';
     ctx.fill();
 
+    // Усики
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath();
+    ctx.moveTo(cx - 48, cy + 16); ctx.lineTo(cx - 90, cy + 10);
+    ctx.moveTo(cx - 48, cy + 24); ctx.lineTo(cx - 92, cy + 28);
+    ctx.moveTo(cx + 48, cy + 16); ctx.lineTo(cx + 90, cy + 10);
+    ctx.moveTo(cx + 48, cy + 24); ctx.lineTo(cx + 92, cy + 28);
+    ctx.stroke();
+
+    // РОТ: Закрытый :3 или ЛЕГЕНДАРНЫЙ POP CAT "O"
+    if (mouthOpen <= 0.08) {
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(cx - 10, cy + 24, 10, 0.1 * Math.PI, 0.9 * Math.PI);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx + 10, cy + 24, 10, 0.1 * Math.PI, 0.9 * Math.PI);
+        ctx.stroke();
+    } else {
+        const popH = 18 + mouthOpen * 44;
+        const popW = 26 + mouthOpen * 30;
+
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 34, popW, popH, 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#5c0610';
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        // Язычок внутри
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 34 + popH * 0.42, popW * 0.72, popH * 0.45, 0, 0, Math.PI);
+        ctx.fillStyle = '#ff6b81';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+    }
+
+    // Шапка поверх котика
+    if (hatStyle && hatStyle !== 'bald') {
+        drawCharacterHat(ctx, cx, cy - 66, hatStyle, suitColor);
+    }
+}
+
+// 3. 🤖 РОБОТ B-42 (Кибер-монитор с эквалайзером речи)
+function drawRobotCharacter(ctx, options) {
+    const {
+        cx,
+        cy,
+        mouthOpen = 0,
+        isBlinking = false,
+        suitColor = '#5865f2',
+        volumeLevel = 0,
+    } = options;
+
+    const isSpeaking = mouthOpen > 0.08 || volumeLevel > 0.05;
+
+    // Плечи / Корпус
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(cx - 105, cy + 125, 210, 115, 12) : ctx.rect(cx - 105, cy + 125, 210, 115);
+    ctx.fillStyle = suitColor;
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Швы и заклёпки на груди
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx - 85, cy + 145, 4, 0, Math.PI * 2);
+    ctx.arc(cx + 85, cy + 145, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Гофрированная шея
+    ctx.fillStyle = '#1c2833';
+    ctx.fillRect(cx - 25, cy + 85, 50, 40);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#000000';
+    ctx.strokeRect(cx - 25, cy + 85, 50, 40);
+
+    // Антенна
+    ctx.beginPath();
+    ctx.rect(cx - 4, cy - 100, 8, 35);
+    ctx.fillStyle = '#7f8c8d';
+    ctx.fill();
+    ctx.stroke();
+
+    // Мигающий маяк антенны
+    ctx.save();
+    if (isSpeaking) {
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = '#00f0ff';
+    } else {
+        ctx.fillStyle = '#e74c3c';
+    }
+    ctx.beginPath();
+    ctx.arc(cx, cy - 108, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
     ctx.restore();
 
-    // 5. БЕЙДЖ С ИМЕНЕМ
+    // Голова / CRT Корпус
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(cx - 85, cy - 65, 170, 150, 20) : ctx.rect(cx - 85, cy - 65, 170, 150);
+    ctx.fillStyle = '#2c3e50';
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Винтики по углам монитора
+    const screws = [
+        [cx - 72, cy - 52], [cx + 72, cy - 52],
+        [cx - 72, cy + 72], [cx + 72, cy + 72]
+    ];
+    ctx.fillStyle = '#95a5a6';
+    screws.forEach(([sx, sy]) => {
+        ctx.beginPath();
+        ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // Экран CRT
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(cx - 68, cy - 48, 136, 116, 12) : ctx.rect(cx - 68, cy - 48, 136, 116);
+    ctx.fillStyle = '#0b131b';
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#1abc9c';
+    ctx.stroke();
+
+    // Пиксельные HUD-глаза
+    const eyeY = cy - 15;
+    const eyeOffsetX = 32;
+
+    ctx.save();
+    ctx.shadowColor = '#00f0ff';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#00f0ff';
+
+    if (isBlinking) {
+        ctx.fillRect(cx - eyeOffsetX - 12, eyeY + 4, 24, 4);
+        ctx.fillRect(cx + eyeOffsetX - 12, eyeY + 4, 24, 4);
+    } else {
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(cx - eyeOffsetX - 11, eyeY - 10, 22, 22, 4) : ctx.rect(cx - eyeOffsetX - 11, eyeY - 10, 22, 22);
+        ctx.roundRect ? ctx.roundRect(cx + eyeOffsetX - 11, eyeY - 10, 22, 22, 4) : ctx.rect(cx + eyeOffsetX - 11, eyeY - 10, 22, 22);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(cx - eyeOffsetX - 3, eyeY - 4, 6, 6);
+        ctx.fillRect(cx + eyeOffsetX - 3, eyeY - 4, 6, 6);
+    }
+    ctx.restore();
+
+    // РОТ: Спектрограмма / Эквалайзер речи в реальном времени
+    const eqY = cy + 42;
+    const numBars = 7;
+    const barW = 8;
+    const barGap = 5;
+    const totalW = numBars * barW + (numBars - 1) * barGap;
+    const startX = cx - totalW / 2;
+
+    ctx.save();
+    ctx.shadowColor = '#39ff14';
+    ctx.shadowBlur = 8;
+
+    const baseWeights = [0.4, 0.7, 1.0, 0.9, 0.95, 0.65, 0.35];
+    for (let i = 0; i < numBars; i++) {
+        const bx = startX + i * (barW + barGap);
+        let bh = 4; // В тишине - плоская индикаторная линия
+
+        if (isSpeaking) {
+            const dynamicScale = Math.sin((Date.now() / 90) + i) * 0.25 + 0.75;
+            bh = 4 + mouthOpen * 28 * baseWeights[i] * dynamicScale;
+        }
+
+        ctx.fillStyle = isSpeaking ? '#39ff14' : '#1e3d2f';
+        ctx.fillRect(bx, eqY - bh / 2, barW, bh);
+    }
+    ctx.restore();
+}
+
+// 4. 🐸 ЛЯГУШОНОК PEPE (Широкая отвисающая челюсть)
+function drawFrogCharacter(ctx, options) {
+    const {
+        cx,
+        cy,
+        mouthOpen = 0,
+        isBlinking = false,
+        suitColor = '#5865f2',
+        hatStyle = 'bald',
+    } = options;
+
+    const dropMouth = Math.max(0, Math.min(1.0, mouthOpen)) * 32;
+
+    // Плечи / Воротник
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 145, 120, 85, 0, Math.PI, 0);
+    ctx.lineTo(cx + 120, cy + 240);
+    ctx.lineTo(cx - 120, cy + 240);
+    ctx.closePath();
+    ctx.fillStyle = suitColor;
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Глазные выступы на макушке
+    const eyeOffsetX = 44;
+    const eyeDomeY = cy - 42;
+    const eyeDomeR = 26;
+
+    ctx.beginPath();
+    ctx.arc(cx - eyeOffsetX, eyeDomeY, eyeDomeR, 0, Math.PI * 2);
+    ctx.arc(cx + eyeOffsetX, eyeDomeY, eyeDomeR, 0, Math.PI * 2);
+    ctx.fillStyle = '#5aa338';
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Голова
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 8, 88, 64, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#5aa338';
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Глаза
+    if (isBlinking) {
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(cx - eyeOffsetX, eyeDomeY, 18, 0, Math.PI);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx + eyeOffsetX, eyeDomeY, 18, 0, Math.PI);
+        ctx.stroke();
+    } else {
+        // Белки
+        ctx.fillStyle = '#f8f9fa';
+        ctx.beginPath();
+        ctx.arc(cx - eyeOffsetX, eyeDomeY, 19, 0, Math.PI * 2);
+        ctx.arc(cx + eyeOffsetX, eyeDomeY, 19, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        // Горизонтальные зрачки
+        ctx.fillStyle = '#111111';
+        ctx.beginPath();
+        ctx.ellipse(cx - eyeOffsetX, eyeDomeY, 11, 6, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx + eyeOffsetX, eyeDomeY, 11, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Румянец
+    ctx.fillStyle = 'rgba(231, 76, 60, 0.25)';
+    ctx.beginPath();
+    ctx.arc(cx - 55, cy + 16, 12, 0, Math.PI * 2);
+    ctx.arc(cx + 55, cy + 16, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // РОТ: Широкая улыбка или отвисающая пасть
+    if (dropMouth <= 2) {
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#000000';
+        ctx.beginPath();
+        ctx.moveTo(cx - 62, cy + 22);
+        ctx.quadraticCurveTo(cx, cy + 42, cx + 62, cy + 22);
+        ctx.stroke();
+    } else {
+        // Открытый мультяшный рот
+        ctx.beginPath();
+        ctx.moveTo(cx - 60, cy + 20);
+        ctx.quadraticCurveTo(cx, cy + 16, cx + 60, cy + 20);
+        ctx.quadraticCurveTo(cx + 50, cy + 28 + dropMouth, cx, cy + 32 + dropMouth);
+        ctx.quadraticCurveTo(cx - 50, cy + 28 + dropMouth, cx - 60, cy + 20);
+        ctx.closePath();
+        ctx.fillStyle = '#3d0812';
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        // Язык
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 22 + dropMouth * 0.7, 34, dropMouth * 0.45, 0, 0, Math.PI);
+        ctx.fillStyle = '#ff5c77';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+    }
+
+    // Шапка между глазными выступами
+    if (hatStyle && hatStyle !== 'bald') {
+        drawCharacterHat(ctx, cx, cy - 60, hatStyle, suitColor);
+    }
+}
+
+// 5. 👻 ПРИВИДЕНИЕ CLYDE (Парящий неоновый призрак)
+function drawGhostCharacter(ctx, options) {
+    const {
+        cx,
+        cy,
+        mouthOpen = 0,
+        isBlinking = false,
+        suitColor = '#5865f2',
+        hatStyle = 'bald',
+    } = options;
+
+    // Плавная левитация вверх-вниз
+    const hoverY = Math.sin(Date.now() / 250) * 8;
+
+    ctx.save();
+    ctx.translate(0, hoverY);
+
+    // Неоновая аура вокруг призрака
+    ctx.shadowColor = suitColor;
+    ctx.shadowBlur = 24;
+
+    // Тело привидения (купол + волнистый низ)
+    ctx.beginPath();
+    ctx.arc(cx, cy - 10, 72, Math.PI, 0);
+    ctx.lineTo(cx + 72, cy + 130);
+
+    // Волнистый край (3 фестона)
+    ctx.quadraticCurveTo(cx + 54, cy + 110, cx + 36, cy + 130);
+    ctx.quadraticCurveTo(cx + 18, cy + 110, cx, cy + 130);
+    ctx.quadraticCurveTo(cx - 18, cy + 110, cx - 36, cy + 130);
+    ctx.quadraticCurveTo(cx - 54, cy + 110, cx - 72, cy + 130);
+    ctx.closePath();
+
+    ctx.fillStyle = '#f8f9ff';
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#1e1f22';
+    ctx.stroke();
+
+    ctx.shadowBlur = 0; // Сброс размытия для глаз и рта
+
+    // Глаза
+    const eyeOffsetX = 28;
+    const eyeY = cy + 4;
+
+    if (isBlinking) {
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(cx - eyeOffsetX, eyeY, 10, Math.PI, 0, true);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx + eyeOffsetX, eyeY, 10, Math.PI, 0, true);
+        ctx.stroke();
+    } else {
+        // Большие глубокие глаза
+        ctx.fillStyle = '#1c1e24';
+        ctx.beginPath();
+        ctx.ellipse(cx - eyeOffsetX, eyeY, 13, 16, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx + eyeOffsetX, eyeY, 13, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Светящиеся блики
+        ctx.fillStyle = suitColor || '#5865f2';
+        ctx.beginPath();
+        ctx.arc(cx - eyeOffsetX - 2, eyeY - 2, 5, 0, Math.PI * 2);
+        ctx.arc(cx + eyeOffsetX - 2, eyeY - 2, 5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Румянец
+    ctx.fillStyle = 'rgba(235, 69, 158, 0.3)';
+    ctx.beginPath();
+    ctx.arc(cx - 44, cy + 24, 10, 0, Math.PI * 2);
+    ctx.arc(cx + 44, cy + 24, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // РОТ: Овальный "Бу!" рот
+    if (mouthOpen <= 0.08) {
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(cx, cy + 32, 7, 0, Math.PI);
+        ctx.stroke();
+    } else {
+        const ghW = 14 + mouthOpen * 14;
+        const ghH = 18 + mouthOpen * 32;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 38, ghW, ghH, 0, 0, Math.PI * 2);
+        ctx.fillStyle = '#1b1429';
+        ctx.fill();
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+    }
+
+    if (hatStyle && hatStyle !== 'bald') {
+        drawCharacterHat(ctx, cx, cy - 82, hatStyle, suitColor);
+    }
+
+    ctx.restore();
+}
+
+// 6. 💀 СКЕЛЕТОН (Клацающий череп)
+function drawSkeletonCharacter(ctx, options) {
+    const {
+        cx,
+        cy,
+        mouthOpen = 0,
+        suitColor = '#5865f2',
+        hatStyle = 'bald',
+    } = options;
+
+    const dropJaw = Math.max(0, Math.min(1.0, mouthOpen)) * 26;
+
+    // Плечи / Тёмное худи
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 145, 120, 85, 0, Math.PI, 0);
+    ctx.lineTo(cx + 120, cy + 240);
+    ctx.lineTo(cx - 120, cy + 240);
+    ctx.closePath();
+    ctx.fillStyle = suitColor;
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Шейный позвонок
+    ctx.fillStyle = '#e8eaed';
+    ctx.fillRect(cx - 16, cy + 70, 32, 28);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#000000';
+    ctx.strokeRect(cx - 16, cy + 70, 32, 28);
+
+    // Основная форма черепа (верхняя часть)
+    ctx.beginPath();
+    ctx.arc(cx, cy - 20, 72, Math.PI * 0.85, Math.PI * 0.15, false);
+    ctx.lineTo(cx + 52, cy + 32);
+    ctx.lineTo(cx - 52, cy + 32);
+    ctx.closePath();
+    ctx.fillStyle = '#edf0f2';
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Темные глазницы
+    const eyeOffsetX = 28;
+    const eyeY = cy - 14;
+
+    ctx.fillStyle = '#111215';
+    ctx.beginPath();
+    ctx.ellipse(cx - eyeOffsetX, eyeY, 18, 22, -0.1, 0, Math.PI * 2);
+    ctx.ellipse(cx + eyeOffsetX, eyeY, 18, 22, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Горящие мистические огоньки в глазницах
+    ctx.save();
+    const emberScale = mouthOpen > 0.15 ? 1.4 : 1.0;
+    ctx.shadowColor = '#23a55a';
+    ctx.shadowBlur = 12 * emberScale;
+    ctx.fillStyle = '#23a55a';
+    ctx.beginPath();
+    ctx.arc(cx - eyeOffsetX, eyeY, 4 * emberScale, 0, Math.PI * 2);
+    ctx.arc(cx + eyeOffsetX, eyeY, 4 * emberScale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Носовая полость (перевернутое сердечко)
+    ctx.fillStyle = '#111215';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + 14);
+    ctx.lineTo(cx - 6, cy + 24);
+    ctx.lineTo(cx + 6, cy + 24);
+    ctx.closePath();
+    ctx.fill();
+
+    // Верхние зубы
+    ctx.fillStyle = '#edf0f2';
+    for (let i = -2; i <= 2; i++) {
+        ctx.fillRect(cx + i * 14 - 5, cy + 28, 10, 10);
+        ctx.strokeRect(cx + i * 14 - 5, cy + 28, 10, 10);
+    }
+
+    // Нижняя клацающая челюсть
+    ctx.save();
+    ctx.translate(0, dropJaw);
+
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(cx - 36, cy + 40, 72, 28, 10) : ctx.rect(cx - 36, cy + 40, 72, 28);
+    ctx.fillStyle = '#edf0f2';
+    ctx.fill();
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Нижние зубы
+    for (let i = -2; i <= 2; i++) {
+        ctx.fillRect(cx + i * 14 - 5, cy + 34, 10, 10);
+        ctx.strokeRect(cx + i * 14 - 5, cy + 34, 10, 10);
+    }
+    ctx.restore();
+
+    // Шапка на черепе
+    if (hatStyle && hatStyle !== 'bald') {
+        drawCharacterHat(ctx, cx, cy - 88, hatStyle, suitColor);
+    }
+}
+
+// Главный роутер для отрисовки любого персонажа
+function drawCartoonCharacter(ctx, options) {
+    const {
+        cx,
+        cy,
+        character = 'southpark',
+        scale = 1.0,
+        nameTag = '',
+        isMiniPreview = false,
+        isMuted = false,
+        volumeLevel = 0,
+    } = options;
+
+    ctx.save();
+    if (scale && scale !== 1.0) {
+        ctx.translate(cx, cy);
+        ctx.scale(scale, scale);
+        ctx.translate(-cx, -cy);
+    }
+
+    switch (character) {
+        case 'popcat':
+            drawPopCatCharacter(ctx, options);
+            break;
+        case 'robot':
+            drawRobotCharacter(ctx, options);
+            break;
+        case 'frog':
+            drawFrogCharacter(ctx, options);
+            break;
+        case 'ghost':
+            drawGhostCharacter(ctx, options);
+            break;
+        case 'skeleton':
+            drawSkeletonCharacter(ctx, options);
+            break;
+        case 'southpark':
+        default:
+            drawSouthParkCharacter(ctx, options);
+            break;
+    }
+
+    // Бейдж с именем
     if (nameTag) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
         const badgeWidth = isMiniPreview ? 140 : 190;
@@ -1036,19 +1391,17 @@ function drawCartoonCharacter(ctx, options) {
             ctx.fillRect(cx - badgeWidth / 2, badgeY, badgeWidth, badgeHeight);
         }
         ctx.fillStyle = '#ffffff';
-        ctx.font =
-            'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(nameTag, cx, badgeY + badgeHeight / 2);
     }
 
-    // 6. ИНДИКАТОР МИКРОФОНА
+    // Индикатор микрофона
     if (!isMiniPreview) {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.font =
-            '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         if (isMuted) {
             ctx.fillStyle = 'rgba(242, 63, 67, 0.85)';
             ctx.fillText('🔇 Микрофон выкл (рот закрыт)', 16, 16);
@@ -1063,80 +1416,6 @@ function drawCartoonCharacter(ctx, options) {
     ctx.restore();
 }
 
-// === АУДИО АНАЛИЗАТОР РЕЧИ (WEB AUDIO API) ===
-function setupAudioAnalyser(stream) {
-    try {
-        const AudioContextClass =
-            window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) return;
-        if (!audioCtx) {
-            audioCtx = new AudioContextClass();
-        }
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-        if (audioSource) {
-            audioSource.disconnect();
-        }
-        analyserNode = audioCtx.createAnalyser();
-        analyserNode.fftSize = 256;
-        analyserNode.smoothingTimeConstant = 0.25;
-        audioSource = audioCtx.createMediaStreamSource(stream);
-        audioSource.connect(analyserNode);
-        log('🎙️ Аудио-анализатор речи подключен к говорящему аватару');
-    } catch (e) {
-        log('⚠️ Ошибка аудио-анализатора: ' + e.message, 'warn');
-    }
-}
-
-// === АУДИО АНАЛИЗАТОР УДАЛЕННОГО СОБЕСЕДНИКА (SPEAKING RING) ===
-function setupRemoteAudioAnalysis(stream) {
-    try {
-        if (!stream || !stream.getAudioTracks().length) return;
-        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtxClass) return;
-        if (!remoteAudioCtx) {
-            remoteAudioCtx = new AudioCtxClass();
-        }
-        if (remoteAudioCtx.state === 'suspended') {
-            remoteAudioCtx.resume();
-        }
-        const src = remoteAudioCtx.createMediaStreamSource(stream);
-        remoteAudioAnalyser = remoteAudioCtx.createAnalyser();
-        remoteAudioAnalyser.fftSize = 256;
-        remoteAudioAnalyser.smoothingTimeConstant = 0.25;
-        src.connect(remoteAudioAnalyser);
-
-        remoteAudioAnalyser.connect(remoteAudioCtx.destination); // Выводим звук на динамики
-        if (remoteVideo) remoteVideo.muted = true;
-
-        function checkRemoteVolume() {
-            if (
-                !remoteAudioAnalyser ||
-                !remoteVideo ||
-                !remoteVideo.srcObject
-            ) {
-                if (remoteTile) remoteTile.classList.remove('speaking');
-                return;
-            }
-            const data = new Uint8Array(remoteAudioAnalyser.frequencyBinCount);
-            remoteAudioAnalyser.getByteFrequencyData(data);
-            let sum = 0;
-            const bins = Math.min(data.length, 35);
-            for (let i = 0; i < bins; i++) sum += data[i];
-            const avg = sum / bins;
-            const isSpeaking = avg > 14;
-            if (remoteTile) remoteTile.classList.toggle('speaking', isSpeaking);
-            remoteAudioAnimFrame = requestAnimationFrame(checkRemoteVolume);
-        }
-
-        if (remoteAudioAnimFrame) cancelAnimationFrame(remoteAudioAnimFrame);
-        checkRemoteVolume();
-        log('🎙️ Аудио-анализатор удаленного собеседника подключен');
-    } catch (e) {
-        log('ℹ️ Удаленный аудио-анализ: ' + e.message, 'warn');
-    }
-}
 
 // === ПОЛУЧЕНИЕ И КЭШИРОВАНИЕ ЗАГРУЖЕННОГО ФОТО ===
 function getUserPhotoImg(onLoadCallback) {
@@ -1397,7 +1676,8 @@ function initAvatarCanvas() {
                         : '👤 Вы (Аватар)',
                     volumeLevel: smoothVolume,
                     isMuted: !micEnabled,
-                    hatStyle: avatarProfile.hatStyle || 'tuft',
+                    hatStyle: avatarProfile.hatStyle || 'ushanka',
+                character: avatarProfile.character || 'southpark',
                 });
             }
         } else {
@@ -1414,7 +1694,8 @@ function initAvatarCanvas() {
                     : '👤 Вы (Аватар)',
                 volumeLevel: smoothVolume,
                 isMuted: !micEnabled,
-                hatStyle: avatarProfile.hatStyle || 'tuft',
+                hatStyle: avatarProfile.hatStyle || 'ushanka',
+                character: avatarProfile.character || 'southpark',
             });
         }
 
@@ -3669,10 +3950,11 @@ function createMockRemoteStream() {
             suitColor: '#e74c3c',
             hairColor: '#e67e22',
             skinColor: '#ffe0bd',
-            nameTag: '👥 Собеседник',
+            nameTag: '👥 Собеседник (Бот)',
             volumeLevel: isSpeaking ? 0.75 : 0,
             isMuted: false,
             hatStyle: 'ushanka',
+            character: isTestMode ? (avatarProfile.character === 'popcat' ? 'robot' : 'popcat') : 'southpark',
         });
 
         testAnimFrame = requestAnimationFrame(render);
@@ -4518,7 +4800,22 @@ function syncAllWardrobeUI() {
         }
     });
 
+    // 3.5. Кнопки выбора персонажа
+    document.querySelectorAll('.character-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.character === (avatarProfile.character || 'southpark'));
+    });
+
     // 4. Кнопки шапок
+    document.querySelectorAll('.character-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            avatarProfile.character = btn.dataset.character;
+            avatarProfile.mode = 'cartoon';
+            saveAvatarProfile();
+            syncAllWardrobeUI();
+            renderWardrobePreview();
+        });
+    });
+
     document.querySelectorAll('.hat-btn').forEach((btn) => {
         btn.classList.toggle('active', btn.dataset.hat === avatarProfile.hatStyle);
     });
@@ -7320,39 +7617,44 @@ function renderRecordingFrame() {
         }
 
         if (!mainDrawn) {
-            // Отрисовка круга аватара главного экрана
-            const cx = w / 2;
-            const cy = h / 2 - 20;
-            const radius = 90;
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.fillStyle = (mainProfile && mainProfile.suitColor) || '#5865f2';
-            ctx.fill();
-
-            if (isMainSpeaking) {
-                ctx.lineWidth = 6;
-                ctx.strokeStyle = '#23a55a';
-                ctx.shadowColor = 'rgba(35, 165, 90, 0.85)';
-                ctx.shadowBlur = 18;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
+            if (mainProfile?.mode === 'disabled') {
+                const cx = w / 2;
+                const cy = h / 2 - 20;
+                const radius = 90;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fillStyle = (mainProfile && mainProfile.suitColor) || '#5865f2';
+                ctx.fill();
+                if (isMainSpeaking) {
+                    ctx.lineWidth = 6;
+                    ctx.strokeStyle = '#23a55a';
+                    ctx.stroke();
+                }
+                const initial = safeMainName.trim().charAt(0).toUpperCase() || '👤';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 72px "Inter", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(initial, cx, cy);
+                ctx.fillStyle = '#f2f3f5';
+                ctx.font = '600 24px "Inter", sans-serif';
+                ctx.fillText(safeMainName, cx, cy + radius + 38);
+                ctx.restore();
+            } else {
+                drawCartoonCharacter(ctx, {
+                    cx: w / 2,
+                    cy: h / 2 - 20,
+                    mouthOpen: isMainSpeaking ? 0.7 : 0,
+                    isBlinking: false,
+                    suitColor: mainProfile?.suitColor || '#5865f2',
+                    nameTag: safeMainName,
+                    character: mainProfile?.character || 'southpark',
+                    hatStyle: mainProfile?.hatStyle || 'ushanka',
+                    volumeLevel: isMainSpeaking ? 0.8 : 0,
+                    scale: 1.35,
+                });
             }
-
-            const initial = safeMainName.trim().charAt(0).toUpperCase() || '👤';
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 72px "Inter", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(initial, cx, cy);
-
-            ctx.fillStyle = '#f2f3f5';
-            ctx.font = '600 24px "Inter", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(safeMainName, cx, cy + radius + 38);
-            ctx.restore();
         }
 
         // 3. Отрисовка угловой плавающей плитки (PiP)
