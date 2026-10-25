@@ -23,7 +23,7 @@
                 <div class="brand-info">
                     <div class="brand-title-wrap">
                         <span class="brand-title">P2P Видеозвонок</span>
-                        <span id="app-version-badge" class="version-badge" title="Версия приложения (нажмите для подробностей)">v1.3.0</span>
+                        <span id="app-version-badge" class="version-badge" title="Версия приложения (нажмите для подробностей)">v1.4.0</span>
                     </div>
                     <span id="call-timer" class="call-timer" style="display: none;">00:00</span>
                 </div>
@@ -325,7 +325,7 @@
                         <div class="lobby-version-left">
                             <span class="footer-dot-live"></span>
                             <span class="lobby-footer-label">Версия:</span>
-                            <span id="lobby-version-badge" class="version-badge" title="Сведения о версии">v1.3.0</span>
+                            <span id="lobby-version-badge" class="version-badge" title="Сведения о версии">v1.4.0</span>
                         </div>
                         <div class="lobby-version-right">
                             <span id="lobby-build-date" class="lobby-build-tag">25.10.2026</span>
@@ -340,6 +340,13 @@
             <!-- ЭКРАН 2: АКТИВНЫЙ ЗВОНОК (CALL STAGE) -->
             <section id="call-stage-view" class="call-stage-view" style="display: none;">
                 <div class="call-stage-container">
+                    <!-- БАННЕР АКТИВНОЙ ЗАПИСИ ЗВОНКА -->
+                    <div id="call-recording-banner" class="call-recording-banner" style="display: none;">
+                        <span class="rec-live-dot"></span>
+                        <span id="call-recording-label">REC (Аудио)</span>
+                        <span id="call-recording-timer">00:00</span>
+                        <button id="stop-recording-banner-btn" class="rec-banner-stop-btn" type="button" title="Остановить запись и сохранить файл">⏹ Остановить</button>
+                    </div>
                     <div class="stage-grid">
                         <!-- Видео собеседника (крупное) -->
                         <div id="remote-tile" class="participant-tile remote-tile">
@@ -606,6 +613,15 @@
                         <span class="btn-caption">Реакции</span>
                     </button>
 
+                    <button id="record-btn" class="dock-btn secondary" title="Запись звонка: звук или видео (R)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                            <circle cx="12" cy="12" r="9" stroke="currentColor"></circle>
+                            <circle id="rec-dot-icon" cx="12" cy="12" r="5" fill="#ed4245"></circle>
+                        </svg>
+                        <span id="record-badge" class="dock-badge record-dock-badge" style="display: none;">REC</span>
+                        <span id="record-caption" class="btn-caption">Запись</span>
+                    </button>
+
                     <button id="chat-toggle-btn" class="dock-btn secondary" title="Чат звонка (C)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
@@ -637,7 +653,7 @@
                         <polyline points="16 18 22 12 16 6"></polyline>
                         <polyline points="8 6 2 12 8 18"></polyline>
                     </svg>
-                    <span>WebRTC DevTools <span id="dev-header-version" class="dev-version-badge">v1.2.0</span></span>
+                    <span>WebRTC DevTools <span id="dev-header-version" class="dev-version-badge">v1.4.0</span></span>
                 </div>
                 <button id="close-dev-btn" class="close-icon-btn" title="Закрыть">✕</button>
             </div>
@@ -960,6 +976,72 @@
                 </div>
             </div>
         </div>
+        <!-- МОДАЛЬНОЕ ОКНО "ЗАПИСЬ ЗВОНКА" -->
+        <div id="record-modal" class="version-modal-backdrop" style="display: none;">
+            <div class="version-modal-content record-modal-content">
+                <div class="version-modal-header">
+                    <div class="version-modal-title">
+                        <span style="font-size: 18px;">🔴</span>
+                        <span>Запись звонка</span>
+                    </div>
+                    <button id="close-record-modal-btn" class="close-icon-btn" title="Закрыть (Esc)">✕</button>
+                </div>
+                <div class="version-modal-body record-modal-body">
+                    <p class="record-modal-subtitle">
+                        Выберите формат записи. Файл генерируется и сохраняется локально на вашем устройстве:
+                    </p>
+
+                    <div class="record-options-grid">
+                        <!-- Вариант 1: Только звук -->
+                        <div class="record-option-card" id="record-opt-audio" tabindex="0">
+                            <div class="record-card-top">
+                                <div class="record-icon-wrap audio">
+                                    <span style="font-size: 26px;">🎙️</span>
+                                </div>
+                                <div class="record-card-info">
+                                    <div class="record-title-row">
+                                        <span class="record-option-title">Запись только звука</span>
+                                        <span class="record-tag audio">Opus / WebM</span>
+                                    </div>
+                                    <div class="record-option-desc">
+                                        Микширует ваш микрофон и собеседника в чистую аудиодорожку созвона. Идеально для подкастов и голосовых бесед (компактный размер).
+                                    </div>
+                                </div>
+                            </div>
+                            <button id="start-record-audio-btn" class="btn btn-secondary record-action-btn" type="button">
+                                🎙️ Начать запись звука
+                            </button>
+                        </div>
+
+                        <!-- Вариант 2: Видео и звук -->
+                        <div class="record-option-card" id="record-opt-video" tabindex="0">
+                            <div class="record-card-top">
+                                <div class="record-icon-wrap video">
+                                    <span style="font-size: 26px;">📹</span>
+                                </div>
+                                <div class="record-card-info">
+                                    <div class="record-title-row">
+                                        <span class="record-option-title">Запись видео и звука</span>
+                                        <span class="record-tag video">HD 720p / 30 FPS</span>
+                                    </div>
+                                    <div class="record-option-desc">
+                                        Записывает весь экран созвона: видео собеседника, демонстрацию экрана, аватары с анимацией рта, индикаторы речи и звук обоих участников.
+                                    </div>
+                                </div>
+                            </div>
+                            <button id="start-record-video-btn" class="btn btn-primary record-action-btn" type="button">
+                                📹 Начать запись видео и звука
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="version-modal-footer">
+                    <span class="record-privacy-hint">🔒 Конфиденциально: запись генерируется прямо в браузере без сервера</span>
+                    <button id="cancel-record-modal-btn" class="btn btn-secondary btn-sm" type="button">Отмена</button>
+                </div>
+            </div>
+        </div>
+
         <!-- МОДАЛЬНОЕ ОКНО "О ВЕРСИИ" -->
         <div id="version-modal" class="version-modal-backdrop" style="display: none;">
             <div class="version-modal-content">
@@ -974,7 +1056,7 @@
                     <div class="version-highlight-card">
                         <div class="vh-main">
                             <span class="vh-name">P2P Видеозвонок</span>
-                            <span id="modal-app-version" class="version-badge lg">v1.2.0</span>
+                            <span id="modal-app-version" class="version-badge lg">v1.4.0</span>
                         </div>
                         <div class="vh-meta">
                             <span>Дата сборки: <strong id="modal-build-date">24.10.2026</strong></span>

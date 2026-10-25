@@ -3762,3 +3762,203 @@ textarea[readonly] {
     transition: all 0.2s ease;
     cursor: pointer;
 }
+
+
+/* ==========================================================================
+   МОДУЛЬ ЗАПИСИ ЗВОНКА (CALL RECORDING: AUDIO ONLY / VIDEO + AUDIO)
+   ========================================================================== */
+
+/* Кнопка записи на панели вызова */
+.dock-btn.recording {
+    background: rgba(237, 66, 69, 0.22) !important;
+    border-color: var(--status-red) !important;
+    color: var(--status-red) !important;
+}
+
+.dock-btn.recording #rec-dot-icon {
+    animation: recDotBlink 0.9s infinite alternate;
+}
+
+.dock-badge.record-dock-badge {
+    background: var(--status-red);
+    color: #fff;
+    font-weight: 800;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    padding: 1px 4px;
+}
+
+/* Плавающий баннер активной записи на экране созвона */
+.call-recording-banner {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(17, 18, 20, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(237, 66, 69, 0.5);
+    border-radius: var(--radius-full);
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 25;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 14px rgba(237, 66, 69, 0.35);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-normal);
+    animation: fadeIn 0.2s ease;
+}
+
+.rec-live-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ed4245;
+    box-shadow: 0 0 8px #ed4245;
+    animation: recDotBlink 0.9s infinite alternate;
+}
+
+@keyframes recDotBlink {
+    0% { opacity: 0.3; transform: scale(0.85); }
+    100% { opacity: 1; transform: scale(1.2); }
+}
+
+.rec-banner-stop-btn {
+    background: rgba(237, 66, 69, 0.85);
+    border: none;
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 4px;
+}
+
+.rec-banner-stop-btn:hover {
+    background: #ed4245;
+    transform: scale(1.05);
+}
+
+/* Модальное окно записи звонка */
+.record-modal-content {
+    max-width: 540px;
+}
+
+.record-modal-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.record-options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.record-option-card {
+    background: var(--bg-tertiary);
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    outline: none;
+}
+
+.record-option-card:hover {
+    background: #383a40;
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+.record-card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.record-icon-wrap {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.record-icon-wrap.audio {
+    background: rgba(88, 101, 242, 0.16);
+    border: 1px solid rgba(88, 101, 242, 0.35);
+}
+
+.record-icon-wrap.video {
+    background: rgba(35, 165, 90, 0.16);
+    border: 1px solid rgba(35, 165, 90, 0.35);
+}
+
+.record-card-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.record-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.record-option-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-header);
+}
+
+.record-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+}
+
+.record-tag.audio {
+    background: rgba(88, 101, 242, 0.2);
+    color: #9ba4f5;
+}
+
+.record-tag.video {
+    background: rgba(35, 165, 90, 0.2);
+    color: var(--status-green);
+}
+
+.record-option-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.record-action-btn {
+    width: 100%;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.record-privacy-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+}

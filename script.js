@@ -1,7 +1,7 @@
 // === КОНФИГУРАЦИЯ И ВЕРСИОНИРОВАНИЕ ПРИЛОЖЕНИЯ ===
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const APP_BUILD_DATE = '25.10.2026';
-const APP_BUILD_ID = '20261025-r2';
+const APP_BUILD_ID = '20261025-r1';
 
 // Делаем версию доступной в глобальном контексте window для удобной отладки в консоли
 window.APP_VERSION = APP_VERSION;
@@ -3833,6 +3833,9 @@ if (devTestCallBtn) {
 
 // === ЗАВЕРШЕНИЕ ЗВОНКА (LEAVE / RESET) ===
 function resetCall(reason = null) {
+    if (isCallRecording) {
+        stopCallRecording();
+    }
     log(`🔴 Завершение вызова и сброс состояния (причина: ${reason || 'ручной сброс'})...`);
     isCallEnding = true;
     clearPendingReconnectTimers();
@@ -7084,6 +7087,10 @@ window.addEventListener('keydown', (e) => {
             closeAvatarModal();
             return;
         }
+        if (recordModal && recordModal.style.display !== 'none') {
+            closeRecordModal();
+            return;
+        }
         if (versionModal && versionModal.style.display !== 'none') {
             closeVersionModal();
             return;
@@ -7136,6 +7143,576 @@ window.addEventListener('keydown', (e) => {
         setScreenDrawTool('eraser');
     }
 });
+
+
+
+// ==========================================================================
+// МОДУЛЬ ЗАПИСИ ЗВОНКА (CALL RECORDING: AUDIO ONLY / VIDEO + AUDIO)
+// ==========================================================================
+let isCallRecording = false;
+let callRecordingMode = null; // 'audio' | 'video'
+let callMediaRecorder = null;
+let callRecordedChunks = [];
+let callRecordingTimerInterval = null;
+let callRecordingStartTime = 0;
+let callRecordingCanvas = null;
+let callRecordingCtx = null;
+let callRecordingAnimFrame = null;
+let callRecordingAudioCtx = null;
+let callRecordingDestNode = null;
+
+const recordBtn = document.getElementById('record-btn');
+const recordModal = document.getElementById('record-modal');
+const closeRecordModalBtn = document.getElementById('close-record-modal-btn');
+const cancelRecordModalBtn = document.getElementById('cancel-record-modal-btn');
+const startRecordAudioBtn = document.getElementById('start-record-audio-btn');
+const startRecordVideoBtn = document.getElementById('start-record-video-btn');
+const stopRecordingBannerBtn = document.getElementById('stop-recording-banner-btn');
+const recordOptAudio = document.getElementById('record-opt-audio');
+const recordOptVideo = document.getElementById('record-opt-video');
+
+function getSupportedRecordingMimeType(mode) {
+    if (mode === 'audio') {
+        const types = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus',
+            'audio/mp4',
+            ''
+        ];
+        return types.find((t) => !t || (window.MediaRecorder && MediaRecorder.isTypeSupported(t))) || '';
+    } else {
+        const types = [
+            'video/webm;codecs=vp8,opus',
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=h264,opus',
+            'video/webm',
+            'video/mp4',
+            ''
+        ];
+        return types.find((t) => !t || (window.MediaRecorder && MediaRecorder.isTypeSupported(t))) || '';
+    }
+}
+
+function openRecordModal() {
+    if (isCallRecording) {
+        stopCallRecording();
+        return;
+    }
+    if (recordModal) {
+        recordModal.style.display = 'flex';
+    }
+}
+
+function closeRecordModal() {
+    if (recordModal) {
+        recordModal.style.display = 'none';
+    }
+}
+
+function updateRecordingUIState(isRecording) {
+    if (recordBtn) {
+        recordBtn.classList.toggle('recording', isRecording);
+        recordBtn.classList.toggle('active', isRecording);
+        const caption = document.getElementById('record-caption');
+        const badge = document.getElementById('record-badge');
+        if (caption) {
+            caption.textContent = isRecording ? '00:00' : 'Запись';
+        }
+        if (badge) {
+            badge.style.display = isRecording ? 'inline-block' : 'none';
+        }
+        recordBtn.title = isRecording
+            ? 'Идёт запись звонка. Нажмите для остановки и скачивания'
+            : 'Запись звонка: звук или видео (R)';
+    }
+
+    const banner = document.getElementById('call-recording-banner');
+    if (banner) {
+        banner.style.display = isRecording ? 'flex' : 'none';
+        const label = document.getElementById('call-recording-label');
+        if (label) {
+            label.textContent = callRecordingMode === 'video' ? 'REC (Видео + Звук)' : 'REC (Аудио)';
+        }
+    }
+
+    if (isRecording) {
+        if (callRecordingTimerInterval) clearInterval(callRecordingTimerInterval);
+        callRecordingTimerInterval = setInterval(() => {
+            const elapsedSec = Math.floor((Date.now() - callRecordingStartTime) / 1000);
+            const m = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+            const s = String(elapsedSec % 60).padStart(2, '0');
+            const timeStr = `${m}:${s}`;
+            const caption = document.getElementById('record-caption');
+            const timerEl = document.getElementById('call-recording-timer');
+            if (caption) caption.textContent = timeStr;
+            if (timerEl) timerEl.textContent = timeStr;
+        }, 1000);
+    } else {
+        if (callRecordingTimerInterval) {
+            clearInterval(callRecordingTimerInterval);
+            callRecordingTimerInterval = null;
+        }
+    }
+}
+
+function renderRecordingFrame() {
+    if (!isCallRecording || callRecordingMode !== 'video' || !callRecordingCanvas) return;
+
+    const ctx = callRecordingCtx;
+    const canvas = callRecordingCanvas;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // 1. Тёмный фон в стиле Discord
+    ctx.fillStyle = '#1e1f22';
+    ctx.fillRect(0, 0, w, h);
+
+    const isLocalMainScreen = stageGrid && stageGrid.classList.contains('local-is-main');
+    const mainVideoEl = isLocalMainScreen ? localVideo : remoteVideo;
+    const secVideoEl = isLocalMainScreen ? remoteVideo : localVideo;
+    const mainTileEl = isLocalMainScreen ? localTile : remoteTile;
+    const secTileEl = isLocalMainScreen ? remoteTile : localTile;
+    const mainProfile = isLocalMainScreen ? avatarProfile : remoteAvatarProfile;
+    const secProfile = isLocalMainScreen ? remoteAvatarProfile : avatarProfile;
+    const isMainSpeaking = mainTileEl && mainTileEl.classList.contains('speaking');
+    const isSecSpeaking = secTileEl && secTileEl.classList.contains('speaking');
+    const mainName = isLocalMainScreen ? (avatarProfile.name || 'Вы') : (isTestMode ? 'Собеседник (Бот)' : (remoteAvatarProfile?.name || 'Собеседник'));
+    const secName = isLocalMainScreen ? (isTestMode ? 'Собеседник (Бот)' : (remoteAvatarProfile?.name || 'Собеседник')) : (avatarProfile.name || 'Вы');
+
+    // 2. Отрисовка основного видеопотока (Главный экран)
+    let mainDrawn = false;
+    if (mainVideoEl && mainVideoEl.style.display !== 'none' && mainVideoEl.readyState >= 2 && mainVideoEl.videoWidth > 0) {
+        try {
+            const vw = mainVideoEl.videoWidth;
+            const vh = mainVideoEl.videoHeight;
+            const scale = Math.min(w / vw, h / vh);
+            const dw = vw * scale;
+            const dh = vh * scale;
+            const dx = (w - dw) / 2;
+            const dy = (h - dh) / 2;
+
+            ctx.save();
+            if (isLocalMainScreen && camEnabled && avatarProfile.mode !== 'disabled') {
+                ctx.translate(w, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(mainVideoEl, (w - dx - dw), dy, dw, dh);
+            } else {
+                ctx.drawImage(mainVideoEl, dx, dy, dw, dh);
+            }
+            ctx.restore();
+            mainDrawn = true;
+        } catch (err) {}
+    }
+
+    if (!mainDrawn) {
+        // Отрисовка круга аватара главного экрана
+        const cx = w / 2;
+        const cy = h / 2 - 20;
+        const radius = 90;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fillStyle = (mainProfile && mainProfile.suitColor) || '#5865f2';
+        ctx.fill();
+
+        if (isMainSpeaking) {
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#23a55a';
+            ctx.shadowColor = 'rgba(35, 165, 90, 0.85)';
+            ctx.shadowBlur = 18;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        const initial = mainName.trim().charAt(0).toUpperCase() || '👤';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 72px "Inter", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(initial, cx, cy);
+
+        ctx.fillStyle = '#f2f3f5';
+        ctx.font = '600 24px "Inter", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(mainName, cx, cy + radius + 38);
+        ctx.restore();
+    }
+
+    // 3. Отрисовка угловой плавающей плитки (PiP)
+    if (secTileEl && secTileEl.style.display !== 'none') {
+        const pipW = 280;
+        const pipH = 165;
+        const pipX = w - pipW - 24;
+        const pipY = h - pipH - 24;
+        const pipR = 12;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(pipX + pipR, pipY);
+        ctx.lineTo(pipX + pipW - pipR, pipY);
+        ctx.arcTo(pipX + pipW, pipY, pipX + pipW, pipY + pipR, pipR);
+        ctx.lineTo(pipX + pipW, pipY + pipH - pipR);
+        ctx.arcTo(pipX + pipW, pipY + pipH, pipX + pipW - pipR, pipY + pipH, pipR);
+        ctx.lineTo(pipX + pipR, pipY + pipH);
+        ctx.arcTo(pipX, pipY + pipH, pipX, pipY + pipH - pipR, pipR);
+        ctx.lineTo(pipX, pipY + pipR);
+        ctx.arcTo(pipX, pipY, pipX + pipR, pipY, pipR);
+        ctx.closePath();
+        ctx.clip();
+
+        ctx.fillStyle = '#18191c';
+        ctx.fillRect(pipX, pipY, pipW, pipH);
+
+        let secDrawn = false;
+        if (secVideoEl && secVideoEl.style.display !== 'none' && secVideoEl.readyState >= 2 && secVideoEl.videoWidth > 0) {
+            try {
+                const svw = secVideoEl.videoWidth;
+                const svh = secVideoEl.videoHeight;
+                const scale = Math.max(pipW / svw, pipH / svh);
+                const sdw = svw * scale;
+                const sdh = svh * scale;
+                const sdx = pipX + (pipW - sdw) / 2;
+                const sdy = pipY + (pipH - sdh) / 2;
+
+                if (!isLocalMainScreen && camEnabled) {
+                    ctx.save();
+                    ctx.translate(pipX * 2 + pipW, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(secVideoEl, sdx, sdy, sdw, sdh);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(secVideoEl, sdx, sdy, sdw, sdh);
+                }
+                secDrawn = true;
+            } catch (err) {}
+        }
+
+        if (!secDrawn) {
+            const pcx = pipX + pipW / 2;
+            const pcy = pipY + pipH / 2 - 12;
+            const pr = 36;
+            ctx.beginPath();
+            ctx.arc(pcx, pcy, pr, 0, Math.PI * 2);
+            ctx.fillStyle = (secProfile && secProfile.suitColor) || '#5865f2';
+            ctx.fill();
+
+            if (isSecSpeaking) {
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#23a55a';
+                ctx.stroke();
+            }
+
+            const pInitial = secName.trim().charAt(0).toUpperCase() || '👤';
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 30px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(pInitial, pcx, pcy);
+
+            ctx.fillStyle = '#dbdee1';
+            ctx.font = '500 13px "Inter", sans-serif';
+            ctx.fillText(secName, pcx, pcy + pr + 20);
+        }
+
+        ctx.restore(); // Сброс clip
+
+        // Рамка PiP окна
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(pipX + pipR, pipY);
+        ctx.lineTo(pipX + pipW - pipR, pipY);
+        ctx.arcTo(pipX + pipW, pipY, pipX + pipW, pipY + pipR, pipR);
+        ctx.lineTo(pipX + pipW, pipY + pipH - pipR);
+        ctx.arcTo(pipX + pipW, pipY + pipH, pipX + pipW - pipR, pipY + pipH, pipR);
+        ctx.lineTo(pipX + pipR, pipY + pipH);
+        ctx.arcTo(pipX, pipY + pipH, pipX, pipY + pipH - pipR, pipR);
+        ctx.lineTo(pipX, pipY + pipR);
+        ctx.arcTo(pipX, pipY, pipX + pipR, pipY, pipR);
+        ctx.closePath();
+        ctx.lineWidth = isSecSpeaking ? 3 : 1.5;
+        ctx.strokeStyle = isSecSpeaking ? '#23a55a' : 'rgba(255, 255, 255, 0.2)';
+        if (isSecSpeaking) {
+            ctx.shadowColor = 'rgba(35, 165, 90, 0.7)';
+            ctx.shadowBlur = 10;
+        }
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // 4. Отрисовка холста интерактивной доски (если открыта)
+    const wbCanvas = document.getElementById('whiteboard-canvas');
+    const wbOverlay = document.getElementById('whiteboard-overlay');
+    if (wbOverlay && wbOverlay.style.display !== 'none' && wbCanvas) {
+        ctx.drawImage(wbCanvas, 0, 0, w, h);
+    }
+
+    // 5. Отрисовка аннотаций экрана (если активны)
+    const drawCanvas = document.getElementById('screen-draw-canvas');
+    if (isScreenDrawActive && drawCanvas) {
+        ctx.drawImage(drawCanvas, 0, 0, w, h);
+    }
+
+    // 6. Бейдж записи в верхнем левом углу
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.beginPath();
+    ctx.arc(28, 28, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#ed4245';
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '600 13px "Inter", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Discord P2P Call', 42, 29);
+    ctx.restore();
+
+    callRecordingAnimFrame = requestAnimationFrame(renderRecordingFrame);
+}
+
+async function startCallRecording(mode = 'audio') {
+    if (isCallRecording) return;
+
+    if (!window.MediaRecorder) {
+        showToastNotification('⚠️ Ваш браузер не поддерживает MediaRecorder для записи', 'error');
+        return;
+    }
+
+    try {
+        callRecordedChunks = [];
+        callRecordingMode = mode;
+
+        // 1. Инициализируем аудио-микшер через Web Audio API
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        callRecordingAudioCtx = new AudioCtxClass();
+        if (callRecordingAudioCtx.state === 'suspended') {
+            await callRecordingAudioCtx.resume();
+        }
+        callRecordingDestNode = callRecordingAudioCtx.createMediaStreamDestination();
+
+        // Микшируем локальный микрофон
+        if (localStream && localStream.getAudioTracks().length > 0) {
+            const lTrack = localStream.getAudioTracks()[0];
+            try {
+                const lSource = callRecordingAudioCtx.createMediaStreamSource(new MediaStream([lTrack]));
+                lSource.connect(callRecordingDestNode);
+            } catch (e) {
+                console.warn('Could not connect local mic to recorder:', e);
+            }
+        }
+
+        // Микшируем входящее аудио собеседника
+        const rStream = remoteVideo?.srcObject;
+        if (rStream && rStream.getAudioTracks && rStream.getAudioTracks().length > 0) {
+            const rTrack = rStream.getAudioTracks()[0];
+            try {
+                const rSource = callRecordingAudioCtx.createMediaStreamSource(new MediaStream([rTrack]));
+                rSource.connect(callRecordingDestNode);
+            } catch (e) {
+                console.warn('Could not connect remote audio to recorder:', e);
+            }
+        }
+
+        // Страховочный аудио-трек (если оба микрофона выключены или еще не инициализированы)
+        if (callRecordingDestNode.stream.getAudioTracks().length === 0) {
+            const osc = callRecordingAudioCtx.createOscillator();
+            const gain = callRecordingAudioCtx.createGain();
+            gain.gain.value = 0.00001; // Неслышимый фоновый поток для удержания дорожки
+            osc.connect(gain);
+            gain.connect(callRecordingDestNode);
+            osc.start();
+        }
+
+        let combinedStream;
+        if (mode === 'video') {
+            callRecordingCanvas = document.createElement('canvas');
+            callRecordingCanvas.width = 1280;
+            callRecordingCanvas.height = 720;
+            callRecordingCtx = callRecordingCanvas.getContext('2d');
+
+            renderRecordingFrame();
+
+            const canvasVideoStream = callRecordingCanvas.captureStream(30);
+            combinedStream = new MediaStream([
+                ...canvasVideoStream.getVideoTracks(),
+                ...callRecordingDestNode.stream.getAudioTracks(),
+            ]);
+        } else {
+            combinedStream = new MediaStream([
+                ...callRecordingDestNode.stream.getAudioTracks(),
+            ]);
+        }
+
+        const mimeType = getSupportedRecordingMimeType(mode);
+        const options = mimeType ? { mimeType } : {};
+        if (mode === 'video') {
+            options.videoBitsPerSecond = 2500000;
+        } else {
+            options.audioBitsPerSecond = 128000;
+        }
+
+        callMediaRecorder = new MediaRecorder(combinedStream, options);
+
+        callMediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+                callRecordedChunks.push(e.data);
+            }
+        };
+
+        callMediaRecorder.onstop = () => {
+            saveRecordedCallBlob();
+        };
+
+        callMediaRecorder.start(1000); // Чанкуем раз в секунду
+        isCallRecording = true;
+        callRecordingStartTime = Date.now();
+
+        updateRecordingUIState(true);
+
+        showToastNotification(
+            mode === 'video'
+                ? '🔴 Запись видео и звука началась'
+                : '🔴 Запись звука звонка началась',
+            'info'
+        );
+        log(`🔴 Запущена запись звонка (режим: ${mode === 'video' ? 'Видео + Звук HD' : 'Только звук'})...`);
+    } catch (err) {
+        console.error('Failed to start call recording:', err);
+        showToastNotification('⚠️ Не удалось запустить запись: ' + err.message, 'error');
+        log('⚠️ Ошибка запуска записи звонка: ' + err.message, 'error');
+        cleanupRecordingState();
+    }
+}
+
+function stopCallRecording() {
+    if (!isCallRecording || !callMediaRecorder) return;
+
+    try {
+        if (callMediaRecorder.state !== 'inactive') {
+            callMediaRecorder.stop();
+        }
+    } catch (e) {
+        console.warn('Error stopping media recorder:', e);
+    }
+
+    isCallRecording = false;
+    updateRecordingUIState(false);
+}
+
+function saveRecordedCallBlob() {
+    if (!callRecordedChunks || callRecordedChunks.length === 0) {
+        cleanupRecordingState();
+        return;
+    }
+
+    try {
+        const mimeType = callMediaRecorder?.mimeType || (callRecordingMode === 'audio' ? 'audio/webm' : 'video/webm');
+        const ext = mimeType.includes('mp4') ? 'mp4' : (mimeType.includes('ogg') ? 'ogg' : 'webm');
+        const blob = new Blob(callRecordedChunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        const d = new Date();
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
+        const filename = `discord-call-${callRecordingMode}-${dateStr}.${ext}`;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 5000);
+
+        const sizeMB = (blob.size / (1024 * 1024)).toFixed(1);
+        showToastNotification(`💾 Запись сохранена: ${filename} (${sizeMB} МБ)`, 'success');
+        log(`💾 Файл записи успешно сохранён: ${filename} (${sizeMB} МБ)`);
+    } catch (err) {
+        console.error('Error saving recording file:', err);
+        showToastNotification('⚠️ Ошибка сохранения файла записи: ' + err.message, 'error');
+    } finally {
+        cleanupRecordingState();
+    }
+}
+
+function cleanupRecordingState() {
+    isCallRecording = false;
+    if (callRecordingAnimFrame) {
+        cancelAnimationFrame(callRecordingAnimFrame);
+        callRecordingAnimFrame = null;
+    }
+    if (callRecordingTimerInterval) {
+        clearInterval(callRecordingTimerInterval);
+        callRecordingTimerInterval = null;
+    }
+    if (callRecordingAudioCtx) {
+        try { callRecordingAudioCtx.close(); } catch (e) {}
+        callRecordingAudioCtx = null;
+    }
+    callRecordingCanvas = null;
+    callRecordingCtx = null;
+    callRecordedChunks = [];
+    callRecordingMode = null;
+    updateRecordingUIState(false);
+}
+
+// Привязка событий записи звонка
+if (recordBtn) {
+    recordBtn.addEventListener('click', () => {
+        if (isCallRecording) {
+            stopCallRecording();
+        } else {
+            openRecordModal();
+        }
+    });
+}
+
+if (closeRecordModalBtn) closeRecordModalBtn.addEventListener('click', closeRecordModal);
+if (cancelRecordModalBtn) cancelRecordModalBtn.addEventListener('click', closeRecordModal);
+if (stopRecordingBannerBtn) stopRecordingBannerBtn.addEventListener('click', stopCallRecording);
+
+if (recordModal) {
+    recordModal.addEventListener('click', (e) => {
+        if (e.target === recordModal) closeRecordModal();
+    });
+}
+
+if (startRecordAudioBtn) {
+    startRecordAudioBtn.addEventListener('click', () => {
+        closeRecordModal();
+        startCallRecording('audio');
+    });
+}
+
+if (startRecordVideoBtn) {
+    startRecordVideoBtn.addEventListener('click', () => {
+        closeRecordModal();
+        startCallRecording('video');
+    });
+}
+
+if (recordOptAudio) {
+    recordOptAudio.addEventListener('click', (e) => {
+        if (e.target !== startRecordAudioBtn) {
+            closeRecordModal();
+            startCallRecording('audio');
+        }
+    });
+}
+
+if (recordOptVideo) {
+    recordOptVideo.addEventListener('click', (e) => {
+        if (e.target !== startRecordVideoBtn) {
+            closeRecordModal();
+            startCallRecording('video');
+        }
+    });
+}
 
 // === DEVTOOLS DRAWER ===
 function toggleDevDrawer() {
