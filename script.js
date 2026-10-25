@@ -1,7 +1,7 @@
 // === КОНФИГУРАЦИЯ И ВЕРСИОНИРОВАНИЕ ПРИЛОЖЕНИЯ ===
 const APP_VERSION = '1.3.0';
 const APP_BUILD_DATE = '25.10.2026';
-const APP_BUILD_ID = '20261025-r1';
+const APP_BUILD_ID = '20261025-r2';
 
 // Делаем версию доступной в глобальном контексте window для удобной отладки в консоли
 window.APP_VERSION = APP_VERSION;
@@ -3754,7 +3754,7 @@ async function startTestCall() {
         testCallBtn.classList.add('active');
     }
     if (devTestCallBtn)
-        devTestCallBtn.textContent = '⏹️ Остановить Test mode call';
+        devTestCallBtn.textContent = '⏹️ Остановить Test mode call'; devTestCallBtn.className = 'btn btn-sm btn-danger';
 
     if (testPeerHangupBtn) testPeerHangupBtn.style.display = 'inline-flex';
     if (devTestPeerHangupBtn) devTestPeerHangupBtn.style.display = 'block';
@@ -3802,7 +3802,7 @@ function stopTestCall() {
         testCallBtn.classList.remove('active');
     }
     if (devTestCallBtn)
-        devTestCallBtn.textContent = '🧪 Test mode call';
+        devTestCallBtn.textContent = '🧪 Test mode call'; devTestCallBtn.className = 'btn btn-sm btn-warning';
 
     if (testPeerHangupBtn) testPeerHangupBtn.style.display = 'none';
     if (devTestPeerHangupBtn) devTestPeerHangupBtn.style.display = 'none';
@@ -3851,8 +3851,7 @@ function resetCall(reason = null) {
             testCallBtn.classList.remove('active');
         }
         if (devTestCallBtn)
-            devTestCallBtn.textContent =
-                '🧪 Запустить / Остановить демо-звонок';
+            devTestCallBtn.textContent = '🧪 Test mode call'; devTestCallBtn.className = 'btn btn-sm btn-warning';
     }
 
     if (testPeerHangupBtn) testPeerHangupBtn.style.display = 'none';
