@@ -1,7 +1,7 @@
 // === КОНФИГУРАЦИЯ И ВЕРСИОНИРОВАНИЕ ПРИЛОЖЕНИЯ ===
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const APP_BUILD_DATE = '25.10.2026';
-const APP_BUILD_ID = '20261025-r1';
+const APP_BUILD_ID = '20261025-r2';
 
 // Делаем версию доступной в глобальном контексте window для удобной отладки в консоли
 window.APP_VERSION = APP_VERSION;
@@ -7154,12 +7154,14 @@ let callRecordingMode = null; // 'audio' | 'video'
 let callMediaRecorder = null;
 let callRecordedChunks = [];
 let callRecordingTimerInterval = null;
+let callRecordingTimerTimeout = null;
 let callRecordingStartTime = 0;
 let callRecordingCanvas = null;
 let callRecordingCtx = null;
 let callRecordingAnimFrame = null;
 let callRecordingAudioCtx = null;
 let callRecordingDestNode = null;
+let callRecordingStream = null;
 
 const recordBtn = document.getElementById('record-btn');
 const recordModal = document.getElementById('record-modal');
@@ -7256,221 +7258,239 @@ function updateRecordingUIState(isRecording) {
     }
 }
 
+function scheduleNextRecordingFrame() {
+    if (!isCallRecording || callRecordingMode !== 'video') return;
+    if (document.hidden) {
+        callRecordingTimerTimeout = setTimeout(renderRecordingFrame, 1000 / 30);
+    } else {
+        callRecordingAnimFrame = requestAnimationFrame(renderRecordingFrame);
+    }
+}
+
 function renderRecordingFrame() {
     if (!isCallRecording || callRecordingMode !== 'video' || !callRecordingCanvas) return;
 
-    const ctx = callRecordingCtx;
-    const canvas = callRecordingCanvas;
-    const w = canvas.width;
-    const h = canvas.height;
+    try {
+        const ctx = callRecordingCtx;
+        const canvas = callRecordingCanvas;
+        const w = canvas.width;
+        const h = canvas.height;
 
-    // 1. Тёмный фон в стиле Discord
-    ctx.fillStyle = '#1e1f22';
-    ctx.fillRect(0, 0, w, h);
+        // 1. Тёмный фон в стиле Discord
+        ctx.fillStyle = '#1e1f22';
+        ctx.fillRect(0, 0, w, h);
 
-    const isLocalMainScreen = stageGrid && stageGrid.classList.contains('local-is-main');
-    const mainVideoEl = isLocalMainScreen ? localVideo : remoteVideo;
-    const secVideoEl = isLocalMainScreen ? remoteVideo : localVideo;
-    const mainTileEl = isLocalMainScreen ? localTile : remoteTile;
-    const secTileEl = isLocalMainScreen ? remoteTile : localTile;
-    const mainProfile = isLocalMainScreen ? avatarProfile : remoteAvatarProfile;
-    const secProfile = isLocalMainScreen ? remoteAvatarProfile : avatarProfile;
-    const isMainSpeaking = mainTileEl && mainTileEl.classList.contains('speaking');
-    const isSecSpeaking = secTileEl && secTileEl.classList.contains('speaking');
-    const mainName = isLocalMainScreen ? (avatarProfile.name || 'Вы') : (isTestMode ? 'Собеседник (Бот)' : (remoteAvatarProfile?.name || 'Собеседник'));
-    const secName = isLocalMainScreen ? (isTestMode ? 'Собеседник (Бот)' : (remoteAvatarProfile?.name || 'Собеседник')) : (avatarProfile.name || 'Вы');
+        const isLocalMainScreen = stageGrid && stageGrid.classList.contains('local-is-main');
+        const mainVideoEl = isLocalMainScreen ? localVideo : remoteVideo;
+        const secVideoEl = isLocalMainScreen ? remoteVideo : localVideo;
+        const mainTileEl = isLocalMainScreen ? localTile : remoteTile;
+        const secTileEl = isLocalMainScreen ? remoteTile : localTile;
+        const mainProfile = isLocalMainScreen ? avatarProfile : remoteAvatarProfile;
+        const secProfile = isLocalMainScreen ? remoteAvatarProfile : avatarProfile;
+        const isMainSpeaking = mainTileEl && mainTileEl.classList.contains('speaking');
+        const isSecSpeaking = secTileEl && secTileEl.classList.contains('speaking');
+        const mainName = isLocalMainScreen ? (avatarProfile?.name || 'Вы') : (isTestMode ? 'Собеседник (Бот)' : (remoteAvatarProfile?.name || 'Собеседник'));
+        const secName = isLocalMainScreen ? (isTestMode ? 'Собеседник (Бот)' : (remoteAvatarProfile?.name || 'Собеседник')) : (avatarProfile?.name || 'Вы');
+        const safeMainName = (mainName && typeof mainName === 'string') ? mainName : 'Вы';
+        const safeSecName = (secName && typeof secName === 'string') ? secName : 'Собеседник';
 
-    // 2. Отрисовка основного видеопотока (Главный экран)
-    let mainDrawn = false;
-    if (mainVideoEl && mainVideoEl.style.display !== 'none' && mainVideoEl.readyState >= 2 && mainVideoEl.videoWidth > 0) {
-        try {
-            const vw = mainVideoEl.videoWidth;
-            const vh = mainVideoEl.videoHeight;
-            const scale = Math.min(w / vw, h / vh);
-            const dw = vw * scale;
-            const dh = vh * scale;
-            const dx = (w - dw) / 2;
-            const dy = (h - dh) / 2;
-
-            ctx.save();
-            if (isLocalMainScreen && camEnabled && avatarProfile.mode !== 'disabled') {
-                ctx.translate(w, 0);
-                ctx.scale(-1, 1);
-                ctx.drawImage(mainVideoEl, (w - dx - dw), dy, dw, dh);
-            } else {
-                ctx.drawImage(mainVideoEl, dx, dy, dw, dh);
-            }
-            ctx.restore();
-            mainDrawn = true;
-        } catch (err) {}
-    }
-
-    if (!mainDrawn) {
-        // Отрисовка круга аватара главного экрана
-        const cx = w / 2;
-        const cy = h / 2 - 20;
-        const radius = 90;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.fillStyle = (mainProfile && mainProfile.suitColor) || '#5865f2';
-        ctx.fill();
-
-        if (isMainSpeaking) {
-            ctx.lineWidth = 6;
-            ctx.strokeStyle = '#23a55a';
-            ctx.shadowColor = 'rgba(35, 165, 90, 0.85)';
-            ctx.shadowBlur = 18;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-        }
-
-        const initial = mainName.trim().charAt(0).toUpperCase() || '👤';
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 72px "Inter", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(initial, cx, cy);
-
-        ctx.fillStyle = '#f2f3f5';
-        ctx.font = '600 24px "Inter", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(mainName, cx, cy + radius + 38);
-        ctx.restore();
-    }
-
-    // 3. Отрисовка угловой плавающей плитки (PiP)
-    if (secTileEl && secTileEl.style.display !== 'none') {
-        const pipW = 280;
-        const pipH = 165;
-        const pipX = w - pipW - 24;
-        const pipY = h - pipH - 24;
-        const pipR = 12;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(pipX + pipR, pipY);
-        ctx.lineTo(pipX + pipW - pipR, pipY);
-        ctx.arcTo(pipX + pipW, pipY, pipX + pipW, pipY + pipR, pipR);
-        ctx.lineTo(pipX + pipW, pipY + pipH - pipR);
-        ctx.arcTo(pipX + pipW, pipY + pipH, pipX + pipW - pipR, pipY + pipH, pipR);
-        ctx.lineTo(pipX + pipR, pipY + pipH);
-        ctx.arcTo(pipX, pipY + pipH, pipX, pipY + pipH - pipR, pipR);
-        ctx.lineTo(pipX, pipY + pipR);
-        ctx.arcTo(pipX, pipY, pipX + pipR, pipY, pipR);
-        ctx.closePath();
-        ctx.clip();
-
-        ctx.fillStyle = '#18191c';
-        ctx.fillRect(pipX, pipY, pipW, pipH);
-
-        let secDrawn = false;
-        if (secVideoEl && secVideoEl.style.display !== 'none' && secVideoEl.readyState >= 2 && secVideoEl.videoWidth > 0) {
+        // 2. Отрисовка основного видеопотока (Главный экран)
+        let mainDrawn = false;
+        if (mainVideoEl && mainVideoEl.style.display !== 'none' && mainVideoEl.readyState >= 2 && mainVideoEl.videoWidth > 0) {
             try {
-                const svw = secVideoEl.videoWidth;
-                const svh = secVideoEl.videoHeight;
-                const scale = Math.max(pipW / svw, pipH / svh);
-                const sdw = svw * scale;
-                const sdh = svh * scale;
-                const sdx = pipX + (pipW - sdw) / 2;
-                const sdy = pipY + (pipH - sdh) / 2;
+                const vw = mainVideoEl.videoWidth;
+                const vh = mainVideoEl.videoHeight;
+                const scale = Math.min(w / vw, h / vh);
+                const dw = vw * scale;
+                const dh = vh * scale;
+                const dx = (w - dw) / 2;
+                const dy = (h - dh) / 2;
 
-                if (!isLocalMainScreen && camEnabled) {
-                    ctx.save();
-                    ctx.translate(pipX * 2 + pipW, 0);
+                ctx.save();
+                if (isLocalMainScreen && camEnabled && avatarProfile?.mode !== 'disabled') {
+                    ctx.translate(w, 0);
                     ctx.scale(-1, 1);
-                    ctx.drawImage(secVideoEl, sdx, sdy, sdw, sdh);
-                    ctx.restore();
+                    ctx.drawImage(mainVideoEl, (w - dx - dw), dy, dw, dh);
                 } else {
-                    ctx.drawImage(secVideoEl, sdx, sdy, sdw, sdh);
+                    ctx.drawImage(mainVideoEl, dx, dy, dw, dh);
                 }
-                secDrawn = true;
+                ctx.restore();
+                mainDrawn = true;
             } catch (err) {}
         }
 
-        if (!secDrawn) {
-            const pcx = pipX + pipW / 2;
-            const pcy = pipY + pipH / 2 - 12;
-            const pr = 36;
+        if (!mainDrawn) {
+            // Отрисовка круга аватара главного экрана
+            const cx = w / 2;
+            const cy = h / 2 - 20;
+            const radius = 90;
+
+            ctx.save();
             ctx.beginPath();
-            ctx.arc(pcx, pcy, pr, 0, Math.PI * 2);
-            ctx.fillStyle = (secProfile && secProfile.suitColor) || '#5865f2';
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fillStyle = (mainProfile && mainProfile.suitColor) || '#5865f2';
             ctx.fill();
 
-            if (isSecSpeaking) {
-                ctx.lineWidth = 4;
+            if (isMainSpeaking) {
+                ctx.lineWidth = 6;
                 ctx.strokeStyle = '#23a55a';
+                ctx.shadowColor = 'rgba(35, 165, 90, 0.85)';
+                ctx.shadowBlur = 18;
                 ctx.stroke();
+                ctx.shadowBlur = 0;
             }
 
-            const pInitial = secName.trim().charAt(0).toUpperCase() || '👤';
+            const initial = safeMainName.trim().charAt(0).toUpperCase() || '👤';
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 30px "Inter", sans-serif';
+            ctx.font = 'bold 72px "Inter", sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(pInitial, pcx, pcy);
+            ctx.fillText(initial, cx, cy);
 
-            ctx.fillStyle = '#dbdee1';
-            ctx.font = '500 13px "Inter", sans-serif';
-            ctx.fillText(secName, pcx, pcy + pr + 20);
+            ctx.fillStyle = '#f2f3f5';
+            ctx.font = '600 24px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(safeMainName, cx, cy + radius + 38);
+            ctx.restore();
         }
 
-        ctx.restore(); // Сброс clip
+        // 3. Отрисовка угловой плавающей плитки (PiP)
+        if (secTileEl && secTileEl.style.display !== 'none') {
+            const pipW = 280;
+            const pipH = 165;
+            const pipX = w - pipW - 24;
+            const pipY = h - pipH - 24;
+            const pipR = 12;
 
-        // Рамка PiP окна
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(pipX + pipR, pipY);
+            ctx.lineTo(pipX + pipW - pipR, pipY);
+            ctx.arcTo(pipX + pipW, pipY, pipX + pipW, pipY + pipR, pipR);
+            ctx.lineTo(pipX + pipW, pipY + pipH - pipR);
+            ctx.arcTo(pipX + pipW, pipY + pipH, pipX + pipW - pipR, pipY + pipH, pipR);
+            ctx.lineTo(pipX + pipR, pipY + pipH);
+            ctx.arcTo(pipX, pipY + pipH, pipX, pipY + pipH - pipR, pipR);
+            ctx.lineTo(pipX, pipY + pipR);
+            ctx.arcTo(pipX, pipY, pipX + pipR, pipY, pipR);
+            ctx.closePath();
+            ctx.clip();
+
+            ctx.fillStyle = '#18191c';
+            ctx.fillRect(pipX, pipY, pipW, pipH);
+
+            let secDrawn = false;
+            if (secVideoEl && secVideoEl.style.display !== 'none' && secVideoEl.readyState >= 2 && secVideoEl.videoWidth > 0) {
+                try {
+                    const svw = secVideoEl.videoWidth;
+                    const svh = secVideoEl.videoHeight;
+                    const scale = Math.max(pipW / svw, pipH / svh);
+                    const sdw = svw * scale;
+                    const sdh = svh * scale;
+                    const sdx = pipX + (pipW - sdw) / 2;
+                    const sdy = pipY + (pipH - sdh) / 2;
+
+                    if (!isLocalMainScreen && camEnabled) {
+                        ctx.save();
+                        ctx.translate(pipX * 2 + pipW, 0);
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(secVideoEl, sdx, sdy, sdw, sdh);
+                        ctx.restore();
+                    } else {
+                        ctx.drawImage(secVideoEl, sdx, sdy, sdw, sdh);
+                    }
+                    secDrawn = true;
+                } catch (err) {}
+            }
+
+            if (!secDrawn) {
+                const pcx = pipX + pipW / 2;
+                const pcy = pipY + pipH / 2 - 12;
+                const pr = 36;
+                ctx.beginPath();
+                ctx.arc(pcx, pcy, pr, 0, Math.PI * 2);
+                ctx.fillStyle = (secProfile && secProfile.suitColor) || '#5865f2';
+                ctx.fill();
+
+                if (isSecSpeaking) {
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = '#23a55a';
+                    ctx.stroke();
+                }
+
+                const pInitial = safeSecName.trim().charAt(0).toUpperCase() || '👤';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 30px "Inter", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(pInitial, pcx, pcy);
+
+                ctx.fillStyle = '#dbdee1';
+                ctx.font = '500 13px "Inter", sans-serif';
+                ctx.fillText(safeSecName, pcx, pcy + pr + 20);
+            }
+
+            ctx.restore(); // Сброс clip
+
+            // Рамка PiP окна
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(pipX + pipR, pipY);
+            ctx.lineTo(pipX + pipW - pipR, pipY);
+            ctx.arcTo(pipX + pipW, pipY, pipX + pipW, pipY + pipR, pipR);
+            ctx.lineTo(pipX + pipW, pipY + pipH - pipR);
+            ctx.arcTo(pipX + pipW, pipY + pipH, pipX + pipW - pipR, pipY + pipH, pipR);
+            ctx.lineTo(pipX + pipR, pipY + pipH);
+            ctx.arcTo(pipX, pipY + pipH, pipX, pipY + pipH - pipR, pipR);
+            ctx.lineTo(pipX, pipY + pipR);
+            ctx.arcTo(pipX, pipY, pipX + pipR, pipY, pipR);
+            ctx.closePath();
+            ctx.lineWidth = isSecSpeaking ? 3 : 1.5;
+            ctx.strokeStyle = isSecSpeaking ? '#23a55a' : 'rgba(255, 255, 255, 0.2)';
+            if (isSecSpeaking) {
+                ctx.shadowColor = 'rgba(35, 165, 90, 0.7)';
+                ctx.shadowBlur = 10;
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 4. Отрисовка холста интерактивной доски (если открыта)
+        const wbCanvas = document.getElementById('whiteboard-canvas');
+        const wbOverlay = document.getElementById('whiteboard-overlay');
+        if (wbOverlay && wbOverlay.style.display !== 'none' && wbCanvas) {
+            try {
+                ctx.drawImage(wbCanvas, 0, 0, w, h);
+            } catch (e) {}
+        }
+
+        // 5. Отрисовка аннотаций экрана (если активны)
+        const drawCanvas = document.getElementById('screen-draw-canvas');
+        if (isScreenDrawActive && drawCanvas) {
+            try {
+                ctx.drawImage(drawCanvas, 0, 0, w, h);
+            } catch (e) {}
+        }
+
+        // 6. Бейдж записи в верхнем левом углу
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(pipX + pipR, pipY);
-        ctx.lineTo(pipX + pipW - pipR, pipY);
-        ctx.arcTo(pipX + pipW, pipY, pipX + pipW, pipY + pipR, pipR);
-        ctx.lineTo(pipX + pipW, pipY + pipH - pipR);
-        ctx.arcTo(pipX + pipW, pipY + pipH, pipX + pipW - pipR, pipY + pipH, pipR);
-        ctx.lineTo(pipX + pipR, pipY + pipH);
-        ctx.arcTo(pipX, pipY + pipH, pipX, pipY + pipH - pipR, pipR);
-        ctx.lineTo(pipX, pipY + pipR);
-        ctx.arcTo(pipX, pipY, pipX + pipR, pipY, pipR);
-        ctx.closePath();
-        ctx.lineWidth = isSecSpeaking ? 3 : 1.5;
-        ctx.strokeStyle = isSecSpeaking ? '#23a55a' : 'rgba(255, 255, 255, 0.2)';
-        if (isSecSpeaking) {
-            ctx.shadowColor = 'rgba(35, 165, 90, 0.7)';
-            ctx.shadowBlur = 10;
-        }
-        ctx.stroke();
+        ctx.arc(28, 28, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#ed4245';
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '600 13px "Inter", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Discord P2P Call', 42, 29);
         ctx.restore();
+    } catch (renderErr) {
+        console.warn('renderRecordingFrame caught error:', renderErr);
+    } finally {
+        scheduleNextRecordingFrame();
     }
-
-    // 4. Отрисовка холста интерактивной доски (если открыта)
-    const wbCanvas = document.getElementById('whiteboard-canvas');
-    const wbOverlay = document.getElementById('whiteboard-overlay');
-    if (wbOverlay && wbOverlay.style.display !== 'none' && wbCanvas) {
-        ctx.drawImage(wbCanvas, 0, 0, w, h);
-    }
-
-    // 5. Отрисовка аннотаций экрана (если активны)
-    const drawCanvas = document.getElementById('screen-draw-canvas');
-    if (isScreenDrawActive && drawCanvas) {
-        ctx.drawImage(drawCanvas, 0, 0, w, h);
-    }
-
-    // 6. Бейдж записи в верхнем левом углу
-    ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.beginPath();
-    ctx.arc(28, 28, 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#ed4245';
-    ctx.fill();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '600 13px "Inter", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Discord P2P Call', 42, 29);
-    ctx.restore();
-
-    callRecordingAnimFrame = requestAnimationFrame(renderRecordingFrame);
 }
 
 async function startCallRecording(mode = 'audio') {
@@ -7484,6 +7504,8 @@ async function startCallRecording(mode = 'audio') {
     try {
         callRecordedChunks = [];
         callRecordingMode = mode;
+        isCallRecording = true;
+        callRecordingStartTime = Date.now();
 
         // 1. Инициализируем аудио-микшер через Web Audio API
         const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
@@ -7492,6 +7514,14 @@ async function startCallRecording(mode = 'audio') {
             await callRecordingAudioCtx.resume();
         }
         callRecordingDestNode = callRecordingAudioCtx.createMediaStreamDestination();
+
+        // Опорный неслышимый генератор для удержания аудио-дорожки активной в любых условиях
+        const osc = callRecordingAudioCtx.createOscillator();
+        const gain = callRecordingAudioCtx.createGain();
+        gain.gain.value = 0.00001;
+        osc.connect(gain);
+        gain.connect(callRecordingDestNode);
+        try { osc.start(); } catch (e) {}
 
         // Микшируем локальный микрофон
         if (localStream && localStream.getAudioTracks().length > 0) {
@@ -7516,16 +7546,6 @@ async function startCallRecording(mode = 'audio') {
             }
         }
 
-        // Страховочный аудио-трек (если оба микрофона выключены или еще не инициализированы)
-        if (callRecordingDestNode.stream.getAudioTracks().length === 0) {
-            const osc = callRecordingAudioCtx.createOscillator();
-            const gain = callRecordingAudioCtx.createGain();
-            gain.gain.value = 0.00001; // Неслышимый фоновый поток для удержания дорожки
-            osc.connect(gain);
-            gain.connect(callRecordingDestNode);
-            osc.start();
-        }
-
         let combinedStream;
         if (mode === 'video') {
             callRecordingCanvas = document.createElement('canvas');
@@ -7533,9 +7553,12 @@ async function startCallRecording(mode = 'audio') {
             callRecordingCanvas.height = 720;
             callRecordingCtx = callRecordingCanvas.getContext('2d');
 
+            // Отрисовываем первый кадр и запускаем цикл рендеринга ДО снятия captureStream
             renderRecordingFrame();
 
-            const canvasVideoStream = callRecordingCanvas.captureStream(30);
+            const captureFn = callRecordingCanvas.captureStream || callRecordingCanvas.mozCaptureStream;
+            const canvasVideoStream = captureFn ? captureFn.call(callRecordingCanvas, 30) : callRecordingCanvas.captureStream(30);
+
             combinedStream = new MediaStream([
                 ...canvasVideoStream.getVideoTracks(),
                 ...callRecordingDestNode.stream.getAudioTracks(),
@@ -7545,16 +7568,38 @@ async function startCallRecording(mode = 'audio') {
                 ...callRecordingDestNode.stream.getAudioTracks(),
             ]);
         }
+        callRecordingStream = combinedStream;
 
         const mimeType = getSupportedRecordingMimeType(mode);
-        const options = mimeType ? { mimeType } : {};
-        if (mode === 'video') {
-            options.videoBitsPerSecond = 2500000;
-        } else {
-            options.audioBitsPerSecond = 128000;
+        let recorder = null;
+
+        // Попытка 1: с mimeType и битрейтом
+        if (mimeType) {
+            try {
+                const opts = { mimeType };
+                if (mode === 'video') opts.videoBitsPerSecond = 2500000;
+                else opts.audioBitsPerSecond = 128000;
+                recorder = new MediaRecorder(combinedStream, opts);
+            } catch (e1) {
+                console.warn('MediaRecorder with bitrate failed, fallback to mimeType only:', e1);
+            }
         }
 
-        callMediaRecorder = new MediaRecorder(combinedStream, options);
+        // Попытка 2: только mimeType
+        if (!recorder && mimeType) {
+            try {
+                recorder = new MediaRecorder(combinedStream, { mimeType });
+            } catch (e2) {
+                console.warn('MediaRecorder with mimeType failed, fallback to default:', e2);
+            }
+        }
+
+        // Попытка 3: дефолтные параметры браузера
+        if (!recorder) {
+            recorder = new MediaRecorder(combinedStream);
+        }
+
+        callMediaRecorder = recorder;
 
         callMediaRecorder.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) {
@@ -7567,8 +7612,6 @@ async function startCallRecording(mode = 'audio') {
         };
 
         callMediaRecorder.start(1000); // Чанкуем раз в секунду
-        isCallRecording = true;
-        callRecordingStartTime = Date.now();
 
         updateRecordingUIState(true);
 
@@ -7591,6 +7634,14 @@ function stopCallRecording() {
     if (!isCallRecording || !callMediaRecorder) return;
 
     try {
+        if (callMediaRecorder.state === 'recording') {
+            callMediaRecorder.requestData();
+        }
+    } catch (e) {
+        console.warn('Error requesting recorder data:', e);
+    }
+
+    try {
         if (callMediaRecorder.state !== 'inactive') {
             callMediaRecorder.stop();
         }
@@ -7599,11 +7650,21 @@ function stopCallRecording() {
     }
 
     isCallRecording = false;
+    if (callRecordingAnimFrame) {
+        cancelAnimationFrame(callRecordingAnimFrame);
+        callRecordingAnimFrame = null;
+    }
+    if (callRecordingTimerTimeout) {
+        clearTimeout(callRecordingTimerTimeout);
+        callRecordingTimerTimeout = null;
+    }
     updateRecordingUIState(false);
 }
 
 function saveRecordedCallBlob() {
     if (!callRecordedChunks || callRecordedChunks.length === 0) {
+        showToastNotification('⚠️ Запись не содержит данных для сохранения', 'warn');
+        log('⚠️ Запись звонка пуста (нет полученных данных от MediaRecorder)', 'warn');
         cleanupRecordingState();
         return;
     }
@@ -7619,17 +7680,20 @@ function saveRecordedCallBlob() {
         a.href = url;
         const d = new Date();
         const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
-        const filename = `discord-call-${callRecordingMode}-${dateStr}.${ext}`;
+        const modeLabel = callRecordingMode || 'call';
+        const filename = `discord-call-${modeLabel}-${dateStr}.${ext}`;
         a.download = filename;
         document.body.appendChild(a);
         a.click();
 
         setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            try {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {}
         }, 5000);
 
-        const sizeMB = (blob.size / (1024 * 1024)).toFixed(1);
+        const sizeMB = (blob.size / (1024 * 1024)).toFixed(2);
         showToastNotification(`💾 Запись сохранена: ${filename} (${sizeMB} МБ)`, 'success');
         log(`💾 Файл записи успешно сохранён: ${filename} (${sizeMB} МБ)`);
     } catch (err) {
@@ -7646,9 +7710,19 @@ function cleanupRecordingState() {
         cancelAnimationFrame(callRecordingAnimFrame);
         callRecordingAnimFrame = null;
     }
+    if (callRecordingTimerTimeout) {
+        clearTimeout(callRecordingTimerTimeout);
+        callRecordingTimerTimeout = null;
+    }
     if (callRecordingTimerInterval) {
         clearInterval(callRecordingTimerInterval);
         callRecordingTimerInterval = null;
+    }
+    if (callRecordingStream) {
+        try {
+            callRecordingStream.getTracks().forEach((track) => track.stop());
+        } catch (e) {}
+        callRecordingStream = null;
     }
     if (callRecordingAudioCtx) {
         try { callRecordingAudioCtx.close(); } catch (e) {}
@@ -7658,6 +7732,7 @@ function cleanupRecordingState() {
     callRecordingCtx = null;
     callRecordedChunks = [];
     callRecordingMode = null;
+    callMediaRecorder = null;
     updateRecordingUIState(false);
 }
 
