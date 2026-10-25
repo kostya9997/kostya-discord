@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+    <defs>
+        <linearGradient id="p2p-cam-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#5865F2"/>
+            <stop offset="100%" stop-color="#404EED"/>
+        </linearGradient>
+    </defs>
+    <!-- Discord squircle background -->
+    <rect width="64" height="64" rx="16" fill="url(#p2p-cam-bg)"/>
+    
+    <!-- Video camera body & lens -->
+    <rect x="11" y="19" width="26" height="26" rx="6" fill="#FFFFFF"/>
+    <path d="M39 26.5 L49 20 C50.5 19 52 20.1 52 21.8 V42.2 C52 43.9 50.5 45 49 44 L39 37.5 V26.5 Z" fill="#FFFFFF"/>
+    
+    <!-- P2P direct peer connection nodes inside camera -->
+    <circle cx="19" cy="32" r="3.2" fill="#5865F2"/>
+    <circle cx="29" cy="32" r="3.2" fill="#5865F2"/>
+    <path d="M19 32 Q24 28 29 32" stroke="#5865F2" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+    <circle cx="24" cy="27" r="1.3" fill="#5865F2"/>
+    
+    <!-- Active online / WebRTC status beacon -->
+    <circle cx="51" cy="13" r="5" fill="#23A55A" stroke="#FFFFFF" stroke-width="2.5"/>
+</svg>

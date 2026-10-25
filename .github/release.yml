@@ -1,0 +1,33 @@
+# Конфигурация автоматической генерации Release Notes в GitHub
+changelog:
+  categories:
+    - title: "🚀 Новые функции и улучшения"
+      labels:
+        - "feature"
+        - "enhancement"
+        - "feat"
+    - title: "⚡ P2P протокол и WebRTC"
+      labels:
+        - "p2p"
+        - "protocol"
+        - "webrtc"
+        - "perf"
+    - title: "🐛 Исправления ошибок"
+      labels:
+        - "fix"
+        - "bug"
+    - title: "🎨 Интерфейс и стили"
+      labels:
+        - "ui"
+        - "style"
+    - title: "🧰 Внутренние изменения и рефакторинг"
+      labels:
+        - "refactor"
+        - "chore"
+        - "maintenance"
+        - "*"
+  exclude:
+    labels:
+      - "skip-changelog"
+      - "ignore-for-release"
+      - "wip"

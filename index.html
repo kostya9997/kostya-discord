@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Discord P2P Call</title>
+    <title>P2P Видеозвонок</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,7 +11,7 @@
 </head>
 <body>
     <div class="app-layout">
-        <!-- Верхняя шапка в стиле Discord -->
+        <!-- Верхняя шапка -->
         <header class="app-header">
             <div class="header-brand">
                 <div class="brand-logo">
@@ -21,7 +21,10 @@
                     </svg>
                 </div>
                 <div class="brand-info">
-                    <span class="brand-title">P2P Видеозвонок</span>
+                    <div class="brand-title-wrap">
+                        <span class="brand-title">P2P Видеозвонок</span>
+                        <span id="app-version-badge" class="version-badge" title="Версия приложения (нажмите для подробностей)">v1.3.0</span>
+                    </div>
                     <span id="call-timer" class="call-timer" style="display: none;">00:00</span>
                 </div>
             </div>
@@ -34,6 +37,9 @@
             </div>
 
             <div class="header-actions">
+                <button id="test-call-btn" class="header-test-btn" title="Запустить симуляцию активного звонка для проверки интерфейса">
+                    🧪 <span class="test-btn-text">Тест UI звонка</span>
+                </button>
                 <button id="toggle-dev-btn" class="header-icon-btn" title="Панель разработчика (WebRTC)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="16 18 22 12 16 6"></polyline>
@@ -52,11 +58,11 @@
                     <div class="banner-icon">⚠️</div>
                     <div class="banner-text">
                         <strong>Связь прервана</strong>
-                        <p id="reconnect-desc">Сеть изменилась или пропал интернет. Попытка восстановления...</p>
+                        <p id="reconnect-desc">Связь с собеседником прервана. Проверка соединения...</p>
                     </div>
                 </div>
                 <div class="banner-actions">
-                    <button id="reconnect-action-btn" class="btn btn-warning btn-sm">Переподключить</button>
+                    <button id="reconnect-action-btn" class="btn btn-danger btn-sm">Завершить звонок</button>
                     <button id="share-new-code-btn" class="btn btn-primary btn-sm" style="display: none;">Отправить новый код</button>
                 </div>
             </div>
@@ -93,8 +99,13 @@
                     <div class="avatar-wardrobe-card">
                         <div class="wardrobe-header">
                             <div class="wardrobe-title-row">
-                                <span class="wardrobe-title">🎭 Говорящий Аватар</span>
+                                <span class="wardrobe-title">🎭 Аватар</span>
                                 <span class="wardrobe-badge">При выкл. камере</span>
+                            </div>
+                            <div class="avatar-mode-tabs">
+                                <button type="button" class="avatar-mode-tab active" data-mode="cartoon">🎭 Персонаж</button>
+                                <button type="button" class="avatar-mode-tab" data-mode="photo">🖼️ Моё фото</button>
+                                <button type="button" class="avatar-mode-tab" data-mode="disabled">🚫 Без аватара</button>
                             </div>
                         </div>
                         <div class="wardrobe-body">
@@ -104,29 +115,84 @@
                             <div class="wardrobe-controls">
                                 <div class="wardrobe-field">
                                     <label for="wardrobe-name-input">Имя на бейдже:</label>
-                                    <input id="wardrobe-name-input" type="text" maxlength="16" placeholder="Ваше имя..." value="Вы">
+                                    <input id="wardrobe-name-input" class="wardrobe-name-input" type="text" maxlength="16" placeholder="Ваше имя..." value="Вы">
                                 </div>
-                                <div class="wardrobe-field">
-                                    <label>Шапка / Причёска:</label>
-                                    <div class="hat-selector">
-                                        <button type="button" class="hat-btn" data-hat="tuft" title="Хохолок">🌱 Хохолок</button>
-                                        <button type="button" class="hat-btn" data-hat="beanie" title="Вязаная шапка">🧶 Шапка</button>
-                                        <button type="button" class="hat-btn active" data-hat="ushanka" title="Медвежья шапка-ушанка РФ">🐻 Медвежья ушанка</button>
-                                        <button type="button" class="hat-btn" data-hat="cap" title="Кепка">🧢 Кепка</button>
-                                        <button type="button" class="hat-btn" data-hat="bald" title="Лысый">🥚 Лысый</button>
+                                <!-- Секция мультяшного персонажа -->
+                                <div id="cartoon-wardrobe-section" class="wardrobe-section">
+                                    <div class="wardrobe-field">
+                                        <label>Шапка / Причёска:</label>
+                                        <div class="hat-selector">
+                                            <button type="button" class="hat-btn" data-hat="tuft" title="Хохолок">🌱 Хохолок</button>
+                                            <button type="button" class="hat-btn" data-hat="beanie" title="Вязаная шапка">🧶 Шапка</button>
+                                            <button type="button" class="hat-btn active" data-hat="ushanka" title="Медвежья шапка-ушанка РФ">🐻 Медвежья ушанка</button>
+                                            <button type="button" class="hat-btn" data-hat="cap" title="Кепка">🧢 Кепка</button>
+                                            <button type="button" class="hat-btn" data-hat="bald" title="Лысый">🥚 Лысый</button>
+                                        </div>
                                     </div>
+                                    <div class="wardrobe-field">
+                                        <label>Цвет куртки:</label>
+                                        <div class="color-palette">
+                                            <button type="button" class="color-dot active" data-color="#5865f2" style="background: #5865f2;" title="Blurple"></button>
+                                            <button type="button" class="color-dot" data-color="#e74c3c" style="background: #e74c3c;" title="Красный"></button>
+                                            <button type="button" class="color-dot" data-color="#23a55a" style="background: #23a55a;" title="Зеленый"></button>
+                                            <button type="button" class="color-dot" data-color="#f39c12" style="background: #f39c12;" title="Оранжевый"></button>
+                                            <button type="button" class="color-dot" data-color="#eb459e" style="background: #eb459e;" title="Розовый"></button>
+                                            <button type="button" class="color-dot" data-color="#00b0f4" style="background: #00b0f4;" title="Голубой"></button>
+                                            <button type="button" class="color-dot" data-color="#23272a" style="background: #23272a;" title="Тёмный"></button>
+                                        </div>
+                                    </div>
+                                    <label class="hide-remote-avatars-label">
+                                        <input type="checkbox" class="hide-remote-avatars-check">
+                                        <span>Скрыть аватаров и у других собеседников (классический режим для всех)</span>
+                                    </label>
                                 </div>
-                                <div class="wardrobe-field">
-                                    <label>Цвет куртки:</label>
-                                    <div class="color-palette">
-                                        <button type="button" class="color-dot active" data-color="#5865f2" style="background: #5865f2;" title="Blurple"></button>
-                                        <button type="button" class="color-dot" data-color="#e74c3c" style="background: #e74c3c;" title="Красный"></button>
-                                        <button type="button" class="color-dot" data-color="#23a55a" style="background: #23a55a;" title="Зеленый"></button>
-                                        <button type="button" class="color-dot" data-color="#f39c12" style="background: #f39c12;" title="Оранжевый"></button>
-                                        <button type="button" class="color-dot" data-color="#eb459e" style="background: #eb459e;" title="Розовый"></button>
-                                        <button type="button" class="color-dot" data-color="#00b0f4" style="background: #00b0f4;" title="Голубой"></button>
-                                        <button type="button" class="color-dot" data-color="#23272a" style="background: #23272a;" title="Тёмный"></button>
+                                <!-- Секция своего фото -->
+                                <div id="photo-wardrobe-section" class="wardrobe-section" style="display: none;">
+                                    <div class="wardrobe-field">
+                                        <label>Загрузка фотографии:</label>
+                                        <div class="photo-upload-actions">
+                                            <input type="file" id="avatar-photo-file-input" class="avatar-photo-file-input" accept="image/*" style="display: none;">
+                                            <button type="button" id="upload-photo-btn" class="btn btn-secondary btn-sm upload-photo-btn">
+                                                📁 Выбрать фото
+                                            </button>
+                                            <button type="button" id="remove-photo-btn" class="btn btn-secondary btn-sm remove-photo-btn" style="display: none;">
+                                                🗑️ Сбросить
+                                            </button>
+                                        </div>
+                                        <p class="photo-hint">
+                                            Фотография обрезается в круг и пульсирует зеленым ореолом во время вашей речи.
+                                        </p>
                                     </div>
+                                    <div class="wardrobe-field">
+                                        <label>Цвет рамки / ореола:</label>
+                                        <div class="color-palette photo-color-palette">
+                                            <button type="button" class="color-dot active" data-color="#5865f2" style="background: #5865f2;" title="Blurple"></button>
+                                            <button type="button" class="color-dot" data-color="#e74c3c" style="background: #e74c3c;" title="Красный"></button>
+                                            <button type="button" class="color-dot" data-color="#23a55a" style="background: #23a55a;" title="Зеленый"></button>
+                                            <button type="button" class="color-dot" data-color="#f39c12" style="background: #f39c12;" title="Оранжевый"></button>
+                                            <button type="button" class="color-dot" data-color="#eb459e" style="background: #eb459e;" title="Розовый"></button>
+                                            <button type="button" class="color-dot" data-color="#00b0f4" style="background: #00b0f4;" title="Голубой"></button>
+                                            <button type="button" class="color-dot" data-color="#23272a" style="background: #23272a;" title="Тёмный"></button>
+                                        </div>
+                                    </div>
+                                    <label class="hide-remote-avatars-label">
+                                        <input type="checkbox" class="hide-remote-avatars-check">
+                                        <span>Скрыть аватаров и у других собеседников (классический режим для всех)</span>
+                                    </label>
+                                </div>
+                                <!-- Секция отключенного аватара -->
+                                <div id="disabled-wardrobe-section" class="wardrobe-section" style="display: none;">
+                                    <div class="disabled-avatar-card">
+                                        <div class="disabled-avatar-icon">🚫</div>
+                                        <div class="disabled-avatar-info">
+                                            <strong>Говорящий аватар выключен</strong>
+                                            <p>При выключенной камере будет показываться классическая карточка профиля без анимации рта и покачиваний головы.</p>
+                                        </div>
+                                    </div>
+                                    <label class="hide-remote-avatars-label">
+                                        <input type="checkbox" class="hide-remote-avatars-check">
+                                        <span>Скрыть аватаров и у других собеседников (классический режим для всех)</span>
+                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -257,6 +323,20 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Футер информации о версии в лобби -->
+                    <div class="lobby-footer">
+                        <div class="lobby-version-left">
+                            <span class="footer-dot-live"></span>
+                            <span class="lobby-footer-label">Версия:</span>
+                            <span id="lobby-version-badge" class="version-badge" title="Сведения о версии">v1.3.0</span>
+                        </div>
+                        <div class="lobby-version-right">
+                            <span id="lobby-build-date" class="lobby-build-tag">25.10.2026</span>
+                            <button id="version-info-btn" type="button" class="version-info-btn" title="История изменений и подробности о версии">
+                                ℹ️ О версии
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -273,10 +353,14 @@
                                 </div>
                                 <span class="avatar-name">Собеседник</span>
                             </div>
+                            <div id="remote-bg-banner" class="remote-bg-banner" style="display: none;">
+                                <span>📱 Собеседник свернул приложение (звонок продолжается)</span>
+                            </div>
                             <div class="participant-badge">
                                 <span class="badge-icon">👥</span>
                                 <span class="badge-name">Собеседник</span>
                                 <span id="remote-mic-status" class="badge-status"></span>
+                                <span id="remote-bg-badge" class="badge-bg-indicator" style="display: none;" title="Собеседник свернул приложение, но аудиосвязь продолжается">📱 В фоне</span>
                             </div>
                         </div>
 
@@ -293,6 +377,12 @@
                                 <span class="badge-icon">👤</span>
                                 <span class="badge-name">Вы (Локально)</span>
                             </div>
+                            <button id="tile-edit-avatar-btn" class="tile-avatar-edit-btn" title="Сменить аватар / загрузить фото (A)">
+                                🎭 Аватар
+                            </button>
+                            <button id="tile-screen-quality-btn" class="tile-screen-quality-btn" style="display: none;" title="Настройки качества демонстрации экрана">
+                                ⚙️ 30 FPS (Стандарт)
+                            </button>
                         </div>
                     </div>
 
@@ -333,9 +423,27 @@
 
                     <!-- ОВЕРЛЕЙ 2: СОВМЕСТНАЯ ДОСКА РИСОВАНИЯ (WHITEBOARD) -->
                     <div id="whiteboard-overlay" class="whiteboard-overlay" style="display: none;">
+                        <div class="wb-pip-header">
+                            <div class="wb-pip-status">
+                                <span class="wb-pip-dot"></span>
+                                <span id="wb-pip-label" class="wb-pip-label">🎨 Доска</span>
+                            </div>
+                            <div class="wb-pip-actions">
+                                <button id="wb-expand-btn" type="button" class="wb-pip-btn expand" title="Развернуть доску на весь экран">⤢ Развернуть</button>
+                                <button id="wb-pip-close-btn" type="button" class="wb-pip-btn close" title="Скрыть доску">✕</button>
+                            </div>
+                        </div>
                         <div class="wb-toolbar">
                             <div class="wb-group">
                                 <span class="wb-title">🎨 Доска</span>
+                                <span id="wb-peer-status" class="wb-peer-status" style="display: none;">✏️ Собеседник рисует...</span>
+                            </div>
+                            <div class="wb-group tools">
+                                <button class="wb-tool-btn active" data-tool="brush" title="✏️ Карандаш (гладкие линии Безье)">✏️</button>
+                                <button class="wb-tool-btn" data-tool="circle" title="⭕ Круг / Овал (удерживайте Shift для идеального круга)">⭕</button>
+                                <button class="wb-tool-btn" data-tool="rect" title="⬜ Прямоугольник (Shift для квадрата)">⬜</button>
+                                <button class="wb-tool-btn" data-tool="arrow" title="➡️ Стрелка (для схем и указателей)">➡️</button>
+                                <button class="wb-tool-btn" data-tool="line" title="📏 Прямая линия">📏</button>
                             </div>
                             <div class="wb-group colors">
                                 <button class="wb-color active" data-color="#ffffff" style="background: #ffffff;" title="Белый"></button>
@@ -362,10 +470,76 @@
                                 <button id="wb-copy-btn" class="wb-action-btn" title="Скопировать рисунок в буфер обмена как картинку (для отправки в чат через Ctrl+V)">📋 Скопировать</button>
                                 <button id="wb-download-btn" class="wb-action-btn" title="Скачать рисунок как PNG файл">💾 Скачать</button>
                                 <button id="wb-send-chat-btn" class="wb-action-btn highlight" title="Отправить рисунок прямо в чат звонка">💬 В чат</button>
-                                <button id="wb-close-btn" class="wb-action-btn close" title="Закрыть доску">✕</button>
+                                <button id="wb-minimize-btn" class="wb-action-btn minimize" title="Свернуть доску в мини-окно (смотреть видео)">🗕 Свернуть</button>
+                                <button id="wb-close-btn" class="wb-action-btn close" title="Скрыть доску">✕</button>
                             </div>
                         </div>
                         <canvas id="whiteboard-canvas"></canvas>
+                        <canvas id="whiteboard-preview-canvas"></canvas>
+                        <div class="wb-pip-hint">Нажмите, чтобы развернуть</div>
+                    </div>
+                    <!-- ОВЕРЛЕЙ 3: РИСОВАНИЕ НА ЭКРАНЕ / АННОТАЦИИ -->
+                    <div id="screen-draw-overlay" class="screen-draw-overlay" style="display: none;">
+                        <canvas id="screen-draw-canvas" class="screen-draw-canvas"></canvas>
+                        <!-- Плавающий остров инструментов (Floating Island) -->
+                        <div id="screen-draw-toolbar" class="screen-draw-toolbar">
+                            <div id="screen-draw-drag-handle" class="screen-draw-drag-handle" title="Перетащить панель">
+                                <span>⋮⋮</span>
+                            </div>
+                            <!-- Инструменты -->
+                            <div class="screen-draw-group tools">
+                                <button id="sdt-laser" class="sdt-btn active" data-tool="laser" title="🔴 Лазерная указка (светится и тает)">
+                                    <span class="sdt-btn-icon">🔴</span>
+                                    <span class="sdt-btn-text">Лазер</span>
+                                </button>
+                                <button id="sdt-fade" class="sdt-btn" data-tool="fade" title="✨ Исчезающие чернила (тают через 2.5 сек)">
+                                    <span class="sdt-btn-icon">✨</span>
+                                    <span class="sdt-btn-text">Исчезающий</span>
+                                </button>
+                                <button id="sdt-pen" class="sdt-btn" data-tool="pen" title="✏️ Постоянный маркер">
+                                    <span class="sdt-btn-icon">✏️</span>
+                                    <span class="sdt-btn-text">Маркер</span>
+                                </button>
+                                <button id="sdt-eraser" class="sdt-btn" data-tool="eraser" title="🧹 Ластик (стирает постоянный маркер)">
+                                    <span class="sdt-btn-icon">🧹</span>
+                                    <span class="sdt-btn-text">Ластик</span>
+                                </button>
+                            </div>
+                            <div class="screen-draw-sep"></div>
+                            <!-- Цвета (Неоновые, контрастные) -->
+                            <div class="screen-draw-group colors">
+                                <button class="sdt-color-btn active" data-color="#57f287" style="--c: #57f287;" title="Неоновый лайм"></button>
+                                <button class="sdt-color-btn" data-color="#fee75c" style="--c: #fee75c;" title="Яркий желтый"></button>
+                                <button class="sdt-color-btn" data-color="#ed4245" style="--c: #ed4245;" title="Красный"></button>
+                                <button class="sdt-color-btn" data-color="#00d2ff" style="--c: #00d2ff;" title="Неоновый циан"></button>
+                                <button class="sdt-color-btn" data-color="#eb459e" style="--c: #eb459e;" title="Фуксия"></button>
+                            </div>
+                            <div class="screen-draw-sep"></div>
+                            <!-- Толщина -->
+                            <div class="screen-draw-group sizes">
+                                <button class="sdt-size-btn" data-size="3" title="Тонкая линия (3px)">
+                                    <span class="sdt-size-dot" style="width: 4px; height: 4px;"></span>
+                                </button>
+                                <button class="sdt-size-btn active" data-size="6" title="Средняя линия (6px)">
+                                    <span class="sdt-size-dot" style="width: 7px; height: 7px;"></span>
+                                </button>
+                                <button class="sdt-size-btn" data-size="12" title="Толстый маркер (12px)">
+                                    <span class="sdt-size-dot" style="width: 12px; height: 12px;"></span>
+                                </button>
+                            </div>
+                            <div class="screen-draw-sep"></div>
+                            <!-- Действия -->
+                            <div class="screen-draw-group actions">
+                                <button id="sdt-clear-btn" class="sdt-act-btn" title="Очистить все рисунки (горячая клавиша C)">🗑️</button>
+                                <button id="sdt-minimize-btn" class="sdt-act-btn minimize" title="Свернуть панель в плавающую кнопку">🗕</button>
+                                <button id="sdt-close-btn" class="sdt-act-btn close" title="Закрыть рисование на экране (E)">✕</button>
+                            </div>
+                        </div>
+                        <!-- Плавающая свернутая кнопка (Floating Pill) -->
+                        <button id="screen-draw-minimized-pill" class="screen-draw-minimized-pill" style="display: none;" title="Развернуть панель рисования (E)">
+                            <span class="pill-pulse-dot"></span>
+                            <span>✏️ Рисование на экране</span>
+                        </button>
                     </div>
 
                     <!-- ВСПЛЫВАЮЩЕЕ ОКНО РЕАКЦИЙ -->
@@ -383,8 +557,8 @@
                     </div>
                 </div>
 
-                <!-- Плавающая нижняя панель управления в стиле Discord -->
-                <nav class="discord-callbar">
+                <!-- Плавающая нижняя панель управления -->
+                <nav class="discord-callbar callbar">
                     <button id="mic-btn" class="dock-btn off" title="Микрофон (M)">
                         <svg class="icon-on" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z" /></svg>
                         <svg class="icon-off" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.98zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-3.02 0-5.42-2.38-5.91-5.38-.08-.6-.56-1.14-1-1.14-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c.98-.18 1.9-.54 2.73-1.05l4.01 4L21 19.73 4.27 3z" /></svg>
@@ -396,14 +570,27 @@
                         <svg class="icon-off" viewBox="0 0 24 24" fill="currentColor"><path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.54-.18L19.73 21 21 19.73 3.27 2z" /></svg>
                         <span class="btn-caption">Камера</span>
                     </button>
+                    <button id="in-call-avatar-btn" class="dock-btn secondary" title="Сменить аватар / загрузить фото (A)">
+                        <span style="font-size: 20px;">🎭</span>
+                        <span class="btn-caption">Аватар</span>
+                    </button>
 
-                    <button id="screen-share-btn" class="dock-btn secondary" title="Демонстрация экрана">
+                    <button id="screen-share-btn" class="dock-btn secondary" title="Демонстрация экрана (S)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                             <line x1="8" y1="21" x2="16" y2="21"></line>
                             <line x1="12" y1="17" x2="12" y2="21"></line>
                         </svg>
+                        <span id="screen-quality-badge" class="dock-badge screen-dock-badge" style="display: none;" title="Качество демонстрации экрана (клик для настройки)">30 FPS</span>
                         <span class="btn-caption">Экран</span>
+                    </button>
+                    <button id="screen-draw-btn" class="dock-btn secondary" title="Рисование на экране (E)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                        <span id="screen-draw-dock-badge" class="dock-badge screen-draw-dock-badge" style="display: none;">ON</span>
+                        <span class="btn-caption">Аннотации</span>
                     </button>
 
                     <button id="whiteboard-btn" class="dock-btn secondary" title="Совместная доска (Рисование)">
@@ -413,6 +600,7 @@
                             <path d="M2 2l7.586 7.586"></path>
                             <circle cx="11" cy="11" r="2"></circle>
                         </svg>
+                        <span id="wb-dock-badge" class="dock-badge wb-dock-badge" style="display: none;">✏️</span>
                         <span class="btn-caption">Доска</span>
                     </button>
 
@@ -435,6 +623,11 @@
                         </svg>
                         <span class="btn-caption">Сброс</span>
                     </button>
+                    <!-- КНОПКА СБРОСА СОБЕСЕДНИКОМ (АКТИВНА В ТЕСТ-МОДЕ) -->
+                    <button id="test-peer-hangup-btn" class="dock-btn test-peer-hangup" style="display: none;" title="Симуляция: собеседник сбросил звонок">
+                        <span style="font-size: 20px;">👤🔴</span>
+                        <span class="btn-caption">Сброс собеседником</span>
+                    </button>
                 </nav>
             </section>
         </main>
@@ -447,16 +640,40 @@
                         <polyline points="16 18 22 12 16 6"></polyline>
                         <polyline points="8 6 2 12 8 18"></polyline>
                     </svg>
-                    <span>WebRTC DevTools</span>
+                    <span>WebRTC DevTools <span id="dev-header-version" class="dev-version-badge">v1.2.0</span></span>
                 </div>
                 <button id="close-dev-btn" class="close-icon-btn" title="Закрыть">✕</button>
             </div>
 
             <div class="dev-content">
+                <!-- Тестирование интерфейса -->
+                <div class="dev-block">
+                    <div class="dev-subtitle">Симуляция активного звонка (Тест UI)</div>
+                    <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+                        Запускает синтетический видеопоток собеседника для проверки отображения видео, плавающей панели и кнопок без второго участника.
+                    </p>
+                    <button id="dev-test-call-btn" class="btn btn-sm btn-warning" style="width: 100%; margin-top: 6px;">
+                        🧪 Запустить / Остановить демо-звонок
+                    </button>
+                    <button id="dev-test-peer-hangup-btn" class="btn btn-sm btn-danger" style="display: none; width: 100%; margin-top: 6px;">
+                        👤🔴 Сброс собеседником (Тест)
+                    </button>
+                    <button id="dev-test-peer-bg-btn" class="btn btn-sm btn-secondary" style="display: none; width: 100%; margin-top: 6px;">
+                        📱 Собеседник свернул сайт (Тест)
+                    </button>
+                </div>
                 <!-- Статусы WebRTC -->
                 <div class="dev-block">
-                    <div class="dev-subtitle">Состояние WebRTC</div>
+                    <div class="dev-subtitle">Состояние WebRTC и Версии</div>
                     <div class="dev-metrics">
+                        <div class="metric-card">
+                            <span class="metric-label">Клиент</span>
+                            <span id="metric-app-version" class="metric-val">v1.2.0</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">Собеседник</span>
+                            <span id="metric-peer-version" class="metric-val" title="Версия приложения у собеседника">—</span>
+                        </div>
                         <div class="metric-card">
                             <span class="metric-label">ICE State</span>
                             <span id="metric-ice-state" class="metric-val">new</span>
@@ -502,6 +719,295 @@
             </div>
         </aside>
 
+        <!-- МОДАЛЬНОЕ ОКНО "ВНЕШНОСТЬ АВАТАРА / ФОТО" (ДОСТУПНО ВО ВРЕМЯ ЗВОНКА И ИЗ ЛОББИ) -->
+        <div id="avatar-modal" class="version-modal-backdrop" style="display: none;">
+            <div class="version-modal-content avatar-modal-content">
+                <div class="version-modal-header">
+                    <div class="version-modal-title">
+                        <span style="font-size: 18px;">🎭</span>
+                        <span>Настройка аватара & Фото</span>
+                    </div>
+                    <button id="close-avatar-modal-btn" class="close-icon-btn" title="Закрыть">✕</button>
+                </div>
+                <div class="version-modal-body">
+                    <!-- Табы выбора: Персонаж / Моё фото -->
+                    <div class="avatar-mode-tabs modal-tabs">
+                        <button type="button" class="avatar-mode-tab active" data-mode="cartoon">🎭 Персонаж</button>
+                        <button type="button" class="avatar-mode-tab" data-mode="photo">🖼️ Моё фото</button>
+                        <button type="button" class="avatar-mode-tab" data-mode="disabled">🚫 Без аватара</button>
+                    </div>
+                    <div class="wardrobe-body in-modal">
+                        <div class="wardrobe-preview">
+                            <canvas id="modal-wardrobe-preview-canvas" width="160" height="150"></canvas>
+                        </div>
+                        <div class="wardrobe-controls">
+                            <div class="wardrobe-field">
+                                <label for="modal-wardrobe-name-input">Имя на бейдже:</label>
+                                <input id="modal-wardrobe-name-input" class="wardrobe-name-input" type="text" maxlength="16" placeholder="Ваше имя..." value="Вы">
+                            </div>
+                            <!-- Секция персонажа -->
+                            <div id="modal-cartoon-section" class="wardrobe-section">
+                                <div class="wardrobe-field">
+                                    <label>Шапка / Причёска:</label>
+                                    <div class="hat-selector">
+                                        <button type="button" class="hat-btn" data-hat="tuft" title="Хохолок">🌱 Хохолок</button>
+                                        <button type="button" class="hat-btn" data-hat="beanie" title="Вязаная шапка">🧶 Шапка</button>
+                                        <button type="button" class="hat-btn active" data-hat="ushanka" title="Медвежья шапка-ушанка РФ">🐻 Медвежья ушанка</button>
+                                        <button type="button" class="hat-btn" data-hat="cap" title="Кепка">🧢 Кепка</button>
+                                        <button type="button" class="hat-btn" data-hat="bald" title="Лысый">🥚 Лысый</button>
+                                    </div>
+                                </div>
+                                <div class="wardrobe-field">
+                                    <label>Цвет куртки:</label>
+                                    <div class="color-palette">
+                                        <button type="button" class="color-dot active" data-color="#5865f2" style="background: #5865f2;" title="Blurple"></button>
+                                        <button type="button" class="color-dot" data-color="#e74c3c" style="background: #e74c3c;" title="Красный"></button>
+                                        <button type="button" class="color-dot" data-color="#23a55a" style="background: #23a55a;" title="Зеленый"></button>
+                                        <button type="button" class="color-dot" data-color="#f39c12" style="background: #f39c12;" title="Оранжевый"></button>
+                                        <button type="button" class="color-dot" data-color="#eb459e" style="background: #eb459e;" title="Розовый"></button>
+                                        <button type="button" class="color-dot" data-color="#00b0f4" style="background: #00b0f4;" title="Голубой"></button>
+                                        <button type="button" class="color-dot" data-color="#23272a" style="background: #23272a;" title="Тёмный"></button>
+                                    </div>
+                                </div>
+                                <label class="hide-remote-avatars-label">
+                                    <input type="checkbox" class="hide-remote-avatars-check">
+                                    <span>Скрыть аватаров и у других собеседников (классический режим для всех)</span>
+                                </label>
+                            </div>
+                            <!-- Секция своего фото -->
+                            <div id="modal-photo-section" class="wardrobe-section" style="display: none;">
+                                <div class="wardrobe-field">
+                                    <label>Загрузка фотографии:</label>
+                                    <div class="photo-upload-actions">
+                                        <input type="file" id="modal-avatar-photo-input" class="avatar-photo-file-input" accept="image/*" style="display: none;">
+                                        <button type="button" id="modal-upload-photo-btn" class="btn btn-secondary btn-sm upload-photo-btn">
+                                            📁 Выбрать фото
+                                        </button>
+                                        <button type="button" id="modal-remove-photo-btn" class="btn btn-secondary btn-sm remove-photo-btn" style="display: none;">
+                                            🗑️ Сбросить
+                                        </button>
+                                    </div>
+                                    <p class="photo-hint">
+                                        Фотография обрезается в круг и пульсирует зеленым ореолом во время вашей речи.
+                                    </p>
+                                </div>
+                                <div class="wardrobe-field">
+                                    <label>Цвет рамки / ореола:</label>
+                                    <div class="color-palette photo-color-palette">
+                                        <button type="button" class="color-dot active" data-color="#5865f2" style="background: #5865f2;" title="Blurple"></button>
+                                        <button type="button" class="color-dot" data-color="#e74c3c" style="background: #e74c3c;" title="Красный"></button>
+                                        <button type="button" class="color-dot" data-color="#23a55a" style="background: #23a55a;" title="Зеленый"></button>
+                                        <button type="button" class="color-dot" data-color="#f39c12" style="background: #f39c12;" title="Оранжевый"></button>
+                                        <button type="button" class="color-dot" data-color="#eb459e" style="background: #eb459e;" title="Розовый"></button>
+                                        <button type="button" class="color-dot" data-color="#00b0f4" style="background: #00b0f4;" title="Голубой"></button>
+                                        <button type="button" class="color-dot" data-color="#23272a" style="background: #23272a;" title="Тёмный"></button>
+                                    </div>
+                                </div>
+                                <label class="hide-remote-avatars-label">
+                                    <input type="checkbox" class="hide-remote-avatars-check">
+                                    <span>Скрыть аватаров и у других собеседников (классический режим для всех)</span>
+                                </label>
+                            </div>
+                            <!-- Секция отключенного аватара -->
+                            <div id="modal-disabled-section" class="wardrobe-section" style="display: none;">
+                                <div class="disabled-avatar-card">
+                                    <div class="disabled-avatar-icon">🚫</div>
+                                    <div class="disabled-avatar-info">
+                                        <strong>Говорящий аватар выключен</strong>
+                                        <p>При выключенной камере будет показываться классическая карточка профиля без анимации рта и покачиваний головы.</p>
+                                    </div>
+                                </div>
+                                <label class="hide-remote-avatars-label">
+                                    <input type="checkbox" class="hide-remote-avatars-check">
+                                    <span>Скрыть аватаров и у других собеседников (классический режим для всех)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="version-modal-footer">
+                    <span class="avatar-modal-status-hint">✨ Изменения сразу видны собеседнику в звонке</span>
+                    <button id="save-avatar-modal-btn" class="btn btn-primary btn-sm">Применить и закрыть</button>
+                </div>
+            </div>
+        </div>
+        <!-- МОДАЛЬНОЕ ОКНО НАСТРОЕК ДЕМОНСТРАЦИИ ЭКРАНА (SCREEN SHARE PRESETS) -->
+        <div id="screen-share-modal" class="version-modal-backdrop" style="display: none;">
+            <div class="version-modal-content screen-modal-content">
+                <div class="version-modal-header">
+                    <div class="version-modal-title">
+                        <span style="font-size: 18px;">🖥️</span>
+                        <span id="screen-modal-title-text">Демонстрация экрана</span>
+                    </div>
+                    <button id="close-screen-modal-btn" class="close-icon-btn" title="Закрыть (Esc)">✕</button>
+                </div>
+                <div class="version-modal-body screen-modal-body">
+                    <!-- Баннер активной трансляции при переключении на лету -->
+                    <div id="screen-live-banner" class="screen-live-banner" style="display: none;">
+                        <span class="live-pulse-dot"></span>
+                        <div class="live-banner-content">
+                            <div>Сейчас в эфире: <strong id="screen-current-preset-label">Стандарт</strong></div>
+                            <div class="live-banner-hint">Вы можете переключить качество на лету без прерывания показа!</div>
+                        </div>
+                    </div>
+                    <div class="screen-section-label">Выберите качество трансляции:</div>
+                    <div class="screen-presets-grid">
+                        <!-- Пресет 1: Эконом -->
+                        <div class="screen-preset-card" data-preset="eco" tabindex="0">
+                            <div class="preset-card-top">
+                                <div class="preset-radio"><div class="preset-radio-inner"></div></div>
+                                <div class="preset-icon">⚡</div>
+                                <div class="preset-info">
+                                    <div class="preset-name-wrap">
+                                        <span class="preset-name">Эконом</span>
+                                        <span class="preset-tag eco">Низкий трафик</span>
+                                    </div>
+                                    <div class="preset-chips">
+                                        <span class="preset-chip">720p HD</span>
+                                        <span class="preset-chip">15 FPS</span>
+                                        <span class="preset-chip">~800 кбит/с</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="preset-desc">
+                                Минимум нагрузки на сеть и процессор. Режим высокой резкости (detail) — текст, Paint, схемы и код всегда четкие.
+                            </div>
+                        </div>
+                        <!-- Пресет 2: Стандарт -->
+                        <div class="screen-preset-card active" data-preset="standard" tabindex="0">
+                            <div class="preset-card-top">
+                                <div class="preset-radio"><div class="preset-radio-inner"></div></div>
+                                <div class="preset-icon">🎬</div>
+                                <div class="preset-info">
+                                    <div class="preset-name-wrap">
+                                        <span class="preset-name">Стандарт</span>
+                                        <span class="preset-tag standard">Рекомендуется</span>
+                                    </div>
+                                    <div class="preset-chips">
+                                        <span class="preset-chip">1080p FHD</span>
+                                        <span class="preset-chip">30 FPS</span>
+                                        <span class="preset-chip">~2.5 Мбит/с</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="preset-desc">
+                                Сбалансированный режим на каждый день. Отличная детализация и комфортная плавность для видео, презентаций и обычных окон.
+                            </div>
+                        </div>
+                        <!-- Пресет 3: Игры / Ультра -->
+                        <div class="screen-preset-card" data-preset="games" tabindex="0">
+                            <div class="preset-card-top">
+                                <div class="preset-radio"><div class="preset-radio-inner"></div></div>
+                                <div class="preset-icon">🎮</div>
+                                <div class="preset-info">
+                                    <div class="preset-name-wrap">
+                                        <span class="preset-name">Игры / Ультра</span>
+                                        <span class="preset-tag games">Макс. плавность</span>
+                                    </div>
+                                    <div class="preset-chips">
+                                        <span class="preset-chip">1080p+ Исходное</span>
+                                        <span class="preset-chip">60 FPS</span>
+                                        <span class="preset-chip">~7.0 Мбит/с</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="preset-desc">
+                                Максимальная частота кадров (60 FPS) и высокий битрейт. Режим динамики (motion) для быстрых игр, динамичных сцен и 60fps-видео.
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Сводка характеристик выбранного пресета -->
+                    <div class="screen-preset-specs-card">
+                        <div class="specs-title">📊 Характеристики выбранного пресета:</div>
+                        <div class="specs-grid">
+                            <div class="spec-item">
+                                <span class="spec-label">Разрешение:</span>
+                                <span id="spec-resolution" class="spec-value">1920×1080 (1080p FHD)</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Частота кадров (FPS):</span>
+                                <span id="spec-fps" class="spec-value">30 FPS</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Лимит битрейта WebRTC:</span>
+                                <span id="spec-bitrate" class="spec-value">~2.5 Мбит/с (2500 kbps)</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Режим кодека:</span>
+                                <span id="spec-hint" class="spec-value">detail (четкость деталей)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Опция системного аудио -->
+                    <label class="screen-audio-toggle">
+                        <input type="checkbox" id="screen-audio-checkbox" checked>
+                        <div class="screen-audio-info">
+                            <span class="audio-toggle-title">🔊 Передавать системный звук (игры / вкладки / системы)</span>
+                            <span class="audio-toggle-hint">Браузер предложит поставить галочку «Поделиться аудио» при выборе окна или вкладки</span>
+                        </div>
+                    </label>
+                </div>
+                <div class="version-modal-footer screen-modal-footer">
+                    <div class="screen-footer-left">
+                        <button id="screen-stop-btn" class="btn btn-danger btn-sm" style="display: none;">
+                            ⏹ Остановить показ
+                        </button>
+                    </div>
+                    <div class="screen-footer-right">
+                        <button id="cancel-screen-modal-btn" class="btn btn-secondary btn-sm">Отмена</button>
+                        <button id="confirm-screen-modal-btn" class="btn btn-primary btn-sm">
+                            <span id="screen-confirm-icon">🖥️</span>
+                            <span id="screen-confirm-text">Начать демонстрацию</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- МОДАЛЬНОЕ ОКНО "О ВЕРСИИ" -->
+        <div id="version-modal" class="version-modal-backdrop" style="display: none;">
+            <div class="version-modal-content">
+                <div class="version-modal-header">
+                    <div class="version-modal-title">
+                        <span style="font-size: 18px;">📦</span>
+                        <span>О приложении & Версионирование</span>
+                    </div>
+                    <button id="close-version-modal-btn" class="close-icon-btn" title="Закрыть">✕</button>
+                </div>
+                <div class="version-modal-body">
+                    <div class="version-highlight-card">
+                        <div class="vh-main">
+                            <span class="vh-name">P2P Видеозвонок</span>
+                            <span id="modal-app-version" class="version-badge lg">v1.2.0</span>
+                        </div>
+                        <div class="vh-meta">
+                            <span>Дата сборки: <strong id="modal-build-date">24.10.2026</strong></span>
+                            <span>Сборка: <code id="modal-build-id">20261024-r2</code></span>
+                        </div>
+                    </div>
+                    <div class="version-features-list">
+                        <h5>Функционал версии v1.2.0:</h5>
+                        <ul>
+                            <li><strong>🚫 Режим «Без аватара» (классический режим):</strong> возможность полностью выключить говорящего персонажа как у себя (без движения рта и покачиваний головы), так и скрыть анимированные аватары собеседников</li>
+                            <li><strong>✏️ Рисование на экране (Screen Annotations):</strong> живые аннотации поверх демонстрации экрана в реальном времени через P2P DataChannel! Исчезающие чернила (тают за 2.5 сек), неоновая лазерная указка со шлейфом, постоянный маркер и плавающий остров инструментов</li>
+                            <li><strong>🖥️ Пресеты демонстрации экрана:</strong> выбор качества («Эконом» 15 FPS / ~800 кбит/с, «Стандарт» 30 FPS / ~2.5 Мбит/с, «Игры / Ультра» 60 FPS / ~7 Мбит/с), переключение на лету без перезапуска, WebRTC оптимизация detail/motion и передача звука системы</li>
+                            <li><strong>🖼️ Своё фото вместо аватара:</strong> загрузка любой фотографии/картинки с интерактивным зелёным ореолом в такт речи</li>
+                            <li><strong>🎭 Смена внешности во время звонка:</strong> кнопка «Аватар» в панели управления и горячая клавиша (A) для мгновенной смены образа</li>
+                            <li><strong>⚡ P2P WebRTC:</strong> прямое соединение mesh без сервера (сжатие SDP токенов)</li>
+                            <li><strong>🎨 Умная совместная доска (Whiteboard):</strong> гладкие кривые Безье вместо ломаных углов, геометрические фигуры (⭕ идеальный круг/овал с Shift, ⬜ прямоугольник, ➡️ стрелка для блок-схем, 📏 прямая линия) с живым интерактивным превью, сохранение, отправка в чат звонка и режим PiP</li>
+                            <li><strong>🎭 Анимированный аватар:</strong> синхронизация речи и рта с микрофоном, гардероб и мемная шапка-ушанка РФ с кокардой</li>
+                            <li><strong>🚀 Сверхбыстрая P2P передача файлов:</strong> передача бинарными ArrayBuffer (64 КБ) без Base64, аппаратный контроль буфера WebRTC SCTP (до 50–80+ МБ/с) и спидометр в реальном времени</li>
+                            <li><strong>🤝 Автопроверка версий:</strong> контроль совместимости версий клиентов при созвоне</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="version-modal-footer">
+                    <button id="force-reload-btn" class="btn btn-secondary btn-sm" title="Очистить кеш браузера и перезагрузить">
+                        🔄 Обновить приложение (сброс кеша)
+                    </button>
+                    <button id="ack-version-btn" class="btn btn-primary btn-sm">Понятно</button>
+                </div>
+            </div>
+        </div>
         <!-- Оверлей затемнения для DevDrawer на мобилках -->
         <div id="drawer-backdrop" class="drawer-backdrop"></div>
     </div>
